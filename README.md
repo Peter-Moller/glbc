@@ -10,6 +10,7 @@ LocalDataDir="/opt/gitlab/data/backups"
 LocalConfDir="/opt/gitlab/config"
 RemoteUser="username"
 RemoteHost="storage.dns.name"
+RemotePath="/some/directory/"
 RemoteDataDir="/some/directory/$MasterServer"
 RemoteConfDir="/some/directory/${MasterServer}_config"
 BackupSignalFile=/opt/gitlab/embedded/service/gitlab-rails/tmp/backup_restore.pid
