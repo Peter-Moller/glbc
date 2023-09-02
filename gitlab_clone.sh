@@ -19,7 +19,6 @@
 # General settings
 Start=$(date +%s)
 export LC_ALL=en_US.UTF-8
-RemotePath="/Volumes/RAID/Backups/$MasterServer"
 StopRebootFile=/tmp/dont_reboot
 TodayDate=$(date +%Y_%m_%d)
 GitlabImportLog=/var/tmp/gitlab_importlogg_$(date +%F).txt
@@ -129,11 +128,11 @@ if [ -n "$RemoteFile" ]; then
             rm -rf data/*
             mv _backups data/backups
 
-            # Kopiera allt i config-katalogen från huvudservern:
+            # Copy everything from the config directory on the main server: TODO!
             cd config || exit 1
-            scp -p -P 2222 $MasterServer.cs.lth.se:/opt/gitlab/config/gitlab-secrets.json .
-            scp -p -P 2222 $MasterServer.cs.lth.se:'/opt/gitlab/config/ssh_*' .
-            scp -p -P 2222 $MasterServer.cs.lth.se:/opt/gitlab/docker-compose.yaml /opt/gitlab/docker-compose.yaml
+            scp -p -P 2222 $MainServer.cs.lth.se:/opt/gitlab/config/gitlab-secrets.json .
+            scp -p -P 2222 $MainServer.cs.lth.se:'/opt/gitlab/config/ssh_*' .
+            scp -p -P 2222 $MainServer.cs.lth.se:/opt/gitlab/docker-compose.yaml /opt/gitlab/docker-compose.yaml
 
             # Skapa en ny, tom instans:
             cd /opt/gitlab/ || exit 1
