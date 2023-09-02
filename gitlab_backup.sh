@@ -66,8 +66,8 @@ notify() {
 # 2.  M A K E    S U R E    T H E R E    I S    E N O U G H    S P A C E    A V A I L A B L E    F O R    A    N E W    B A C K U P
 # Stop if there is not enough space available (assumes the newxt backup will be ≈ like the last)
 
-SizeLastBackup=$(ls -ls "$LocalDataDir" | grep -Ev "^total " | head -1 | awk '{print $6}')                        # Ex: SizeLastBackup=17140336640
-SpaceAvailable=$(df -kB1 "$LocalDataDir" | grep -Ev "^Fil" | awk '{print $4}')                                    # Ex: SpaceAvailable=51703066624
+SizeLastBackup=$(ls -ls "$LocalBackupDir" | grep -Ev "^total " | head -1 | awk '{print $6}')                        # Ex: SizeLastBackup=17140336640
+SpaceAvailable=$(df -kB1 "$LocalBackupDir" | grep -Ev "^Fil" | awk '{print $4}')                                    # Ex: SpaceAvailable=51703066624
 if [ $(echo "$SizeLastBackup * 2.3" | bc -l | cut -d\. -f1) -gt $SpaceAvailable ]; then
     DetailsJSON='{ "reporter":"'$ScriptFullName'", "space-available":"'$SpaceAvailable'", "num-bytes-last-backup": '${SizeLastBackup:-0}' }'
     notify "/app/gitlab/backup" "Backup of gitlab cannot be done: not enough space available" "CRIT" "$DetailsJSON"
@@ -126,7 +126,7 @@ fi
 StartTimeSync=$(date +%s)
 # Sync the database backup
 echo "rsync of backup" > $StopRebootFile
-RsyncData="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times -e ssh "$LocalDataDir"/ "$RemoteUser"@"$RemoteHost":"$RemoteDataDir"/)"
+RsyncData="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times -e ssh "$LocalBackupDir"/ "$RemoteUser"@"$RemoteHost":"$RemoteDataDir"/)"
 ESrsync1=$?
 # Sync the config directory
 RsyncConf="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times -e ssh "$LocalConfDir"/ "$RemoteUser"@"$RemoteHost":"$RemoteConfDir"/)"
@@ -143,7 +143,7 @@ FilesData=$(echo "$RsyncData" | grep -vcE "^building file list |^\.\/$|^$|^sent 
 FilesConf=$(echo "$RsyncConf" | grep -vcE "^building file list |^\.\/$|^$|^sent |^total|\/$")
 FilesTransferred=$((${FilesData:-0} + ${FilesConf:-0}))
 DetailsJSONRsync='{"remote-dir-data":"'$RemoteDataDir'","remote-dir-conf":"'$RemoteConfDir'","reporter":"'$ScriptFullName'","rsync-stats": { "files":'${FilesTransferred:-0}', "bytes": '${BytesTransferred:-0}', "time": '${SecsTimeSync:-0}'}}'
-DetailsTextRsync="Data directory:   $LocalDataDir  ->  $RemoteDataDir${NL}"
+DetailsTextRsync="Backup directory:  $LocalBackupDir  ->  $RemoteDataDir${NL}"
 DetailsTextRsync+="Config directory: $LocalConfDir  ->  $RemoteConfDir${NL}"
 DetailsTextRsync+="Number of files:  ${FilesTransferred:-0}${NL}"
 DetailsTextRsync+="Bytes trasferred: $(printf "%'d" $((BytesTransferred / 1048576))) MiB${NL}"
