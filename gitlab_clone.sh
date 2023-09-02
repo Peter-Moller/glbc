@@ -121,7 +121,7 @@ if [ -n "$RemoteFile" ]; then
             # Now delete the current one and prepare for the restore:
             # Stoppa körande container:
             cd /opt/gitlab/ || exit 1
-            /usr/local/bin/docker compose down
+            docker compose down
 
             # Radera den gamla instansen (spara katalogen 'backups')
             mv data/backups _backups
@@ -136,7 +136,7 @@ if [ -n "$RemoteFile" ]; then
 
             # Skapa en ny, tom instans:
             cd /opt/gitlab/ || exit 1
-            /usr/local/bin/docker compose up --force-recreate -d
+            docker compose up --force-recreate -d
 
             # Vänta tills den är uppe
             while true
