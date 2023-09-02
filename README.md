@@ -6,7 +6,7 @@ GitLab Backup and Clone
 ```bash
 GitServer="git.dns.name"
 MasterServer="git"
-LocalDataDir="/opt/gitlab/data/backups"
+LocalBackupDir="/opt/gitlab/data/backups"
 LocalConfDir="/opt/gitlab/config"
 RemoteUser="username"
 RemoteHost="storage.dns.name"
