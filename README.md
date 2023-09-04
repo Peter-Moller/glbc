@@ -26,6 +26,7 @@ In order to work, a settings file is required.
 ```bash
 GitServer="git.dns.name"
 MainServer="git"
+ReplicaServer="git-test"
 LocalBackupDir="/opt/gitlab/data/backups"
 LocalConfDir="/opt/gitlab/config"
 RemoteUser="username"
