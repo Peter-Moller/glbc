@@ -67,14 +67,26 @@ notify() {
     fi
 }
 
+SleepWait() {
+    while true
+    do
+        STATUS="$(docker exec -t gitlab curl -k https://localhost/-/readiness 2>/dev/null | jq -r '.status' 2>/dev/null)"                             # Ex: STATUS=ok
+        MASTER_CHECK="$(docker exec -t gitlab curl -k https://localhost/-/readiness 2>/dev/null | jq -r '.master_check[0].status' 2>/dev/null)"       # Ex: MASTER_CHECK=ok
+        if [ "$STATUS" = "ok" ] && [ "$MASTER_CHECK" = "ok" ]; then
+            break
+        fi
+        sleep 15
+    done
+}
+
 
 # Start doing some work: get the backup file and associated metadata
 # Use specified listing to get date and time of backup.
 # Note: on macOS, this is '-D "format"'. On Linux, the same is done with '--time-style=full-iso'
 if [ "$RemoteHostKind" = "linux" ]; then
-    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -ls --time-style=full-iso $RemotePath/*_gitlab_backup.tar")"
+    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst --time-style=full-iso $RemotePath/*_gitlab_backup.tar")"
 else
-    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -ls -D \"%F %H:%M\" $RemotePath/*_gitlab_backup.tar")"
+    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemotePath/*_gitlab_backup.tar")"
 fi
 RemoteFile="$(echo "$RemoteFiles" | grep "_${TodayDate}_" 2>/dev/null | head -1)"
 # Ex: RemoteFile='99134120 -rw-------  1 username  staff  50756669440 2023-08-31 04:38 /some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
@@ -88,7 +100,7 @@ BackupTime="$(echo "$RemoteFile" | awk '{print $7" "$8}')"         # Ex: BackupT
 # Get the amount of storage available locally:
 SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')  # Ex: SpaceAvailable='301852954624'
 # What version og GitLab is running (prior to restore)
-RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\n')"   # Ex: RunningVersion='gitlab-ce 16.3.0'
+RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\r')"   # Ex: RunningVersion='gitlab-ce 16.3.0'
 
 ScriptNameLocation
 
@@ -138,17 +150,8 @@ if [ -n "$RemoteFile" ]; then
             cd /opt/gitlab/ || exit 1
             docker compose up --force-recreate -d
 
-            # Vänta tills den är uppe
-            while true
-            do
-                STATUS="$(docker exec -t gitlab curl -k https://localhost/-/readiness 2>/dev/null | jq -r '.status' 2>/dev/null)"                             # Ex: STATUS=ok
-                MASTER_CHECK="$(docker exec -t gitlab curl -k https://localhost/-/readiness 2>/dev/null | jq -r '.master_check[0].status' 2>/dev/null)"       # Ex: MASTER_CHECK=ok
-                if [ "$STATUS" = "ok" ] && [ "$MASTER_CHECK" = "ok" ]; then
-                    break
-                fi
-                sleep 15
-            done
-            #sleep 5m
+            # Wait until it's up
+            SleepWait
 
             # Stop 'puma' and 'sidekiq':
             docker exec -t gitlab gitlab-ctl stop puma
@@ -177,17 +180,8 @@ if [ -n "$RemoteFile" ]; then
             # Start gitlab again:
             docker restart gitlab
 
-            # Wait 5 minutes (restart takes time):
-            while true
-            do
-                STATUS="$(docker exec -t gitlab curl -k https://localhost/-/readiness 2>/dev/null | jq -r '.status' 2>/dev/null)"                             # Ex: STATUS=ok
-                MASTER_CHECK="$(docker exec -t gitlab curl -k https://localhost/-/readiness 2>/dev/null | jq -r '.master_check[0].status' 2>/dev/null)"       # Ex: MASTER_CHECK=ok
-                if [ "$STATUS" = "ok" ] && [ "$MASTER_CHECK" = "ok" ]; then
-                    break
-                fi
-                sleep 30
-            done
-            #sleep 5m
+            # Wait (restart takes time):
+            SleepWait
 
             # Check if everything is OK:
             echo "checking gitlab after restore" > "$StopRebootFile"
@@ -218,18 +212,18 @@ if [ -n "$RemoteFile" ]; then
             MailBodyStr+="Details:${NL}"
             MailBodyStr+="---------------------------${NL}"
             MailBodyStr+="$(printf "$FormatStr\n" "Running ver.:" "$RunningVersion")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "ver. in file:" "$GitlabVersionInFile")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}:$RemotePath")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Backup time:" "$BackupTime")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Restore time:" "$RestoreTimeStart")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Backup time:" "$BackupTime (end)")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Restore time:" "$RestoreTimeStart (start)")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Time taken:" "${TimeTaken/0 hour /}")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Details:" "$GitlabImportLog")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" " -" "$GitlabReconfigureLog")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" " -" "$GitlabVerifyLog")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Details, import:" "$GitlabImportLog")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Details, reconf.:" "$GitlabReconfigureLog")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Details, verify:" "$GitlabVerifyLog")$NL"
             if [ $ES_restore -ne 0 ]; then
                 MailBodyStr+="${NL}${NL}ERROR:${NL}"
                 MailBodyStr+="$ErrorText${NL}"
