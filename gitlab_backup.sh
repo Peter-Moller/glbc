@@ -86,6 +86,7 @@ if docker exec -it gitlab ls $BackupSignalFile &>/dev/null; then
     docker exec -it gitlab rm $BackupSignalFile
 fi
 
+cd "$LocalDataDir" || exit 1
 StartTimeBackup=$(date +%s)
 BackupOutputFile=$(mktemp)
 # Do the actual backup:
@@ -93,23 +94,22 @@ BackupOutputFile=$(mktemp)
 ESbackup=$?
 EndTimeBackup=$(date +%s)
 SecsTimeBackup=$((EndTimeBackup - StartTimeBackup))
-TimeTakenTimeBackup="$((SecsTimeBackup/3600)) hour $((SecsTimeBackup%3600/60)) min $((SecsTimeBackup%60)) sec"     # Ex: TimeTakenTimeBackup='0 hour 22 min 15 sec'
-BackupNameTmp="$(grep -oE " -- Backup [e0-9._-]* is done." "$BackupOutputFile" 2>/dev/null)"                       # Ex: BackupNameTmp=' -- Backup 1692167159_2023_08_16_15.11.11 is done.'
+TimeTakenTimeBackup="$((SecsTimeBackup/3600)) hour $((SecsTimeBackup%3600/60)) min $((SecsTimeBackup%60)) sec"          # Ex: TimeTakenTimeBackup='0 hour 22 min 15 sec'
+BackupNameTmp="$(grep -oE " -- Backup [e0-9._-]* is done." "$BackupOutputFile" 2>/dev/null)"                            # Ex: BackupNameTmp=' -- Backup 1692167159_2023_08_16_15.11.11 is done.'
 if [ -n "$BackupNameTmp" ]; then
-    BackupName="$(echo "$BackupNameTmp" | awk '{print $3}')_gitlab_backup.tar"                                     # Ex: BackupName='1654245725_2022_06_03_15.0.1_gitlab_backup.tar'
+    BackupName="$(echo "$BackupNameTmp" | awk '{print $3}')_gitlab_backup.tar"                                          # Ex: BackupName='1654245725_2022_06_03_15.0.1_gitlab_backup.tar'
 else
     BackupName="probably_broken_$(date +%F)_gitlab_backup.tar"
 fi
-GitlabVersionInFile="$(tar -xOf "$BackupOutputFile" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')"       # Ex: GitlabVersionInFile=16.2.4
-BackupFileSize=$(find /opt/gitlab/data/backups/"$BackupName" -exec ls -ls {} \; | awk '{print $6}')                # Ex: BackupFileSize='47692830720'
-BackupFileSizeMiB="$(printf "%'d" $((BackupFileSize / 1048576))) MiB"                                              # Ex: BackupFileSizeMic='45,483 MiB'
-BackupFileSizeGiB="$(printf "%'d" $((BackupFileSize / 1073741824))) GiB"                                           # Ex: BackupFileSizeGiB='44 GiB'
+GitlabVersionInFile="$(tar -xOf "$BackupName" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')" # Ex: GitlabVersionInFile=16.2.4
+BackupFileSize=$(find /opt/gitlab/data/backups/"$BackupName" -exec ls -ls {} \; | awk '{print $6}')                     # Ex: BackupFileSize='47692830720'
+BackupFileSizeMiB="$(printf "%'d" $((BackupFileSize / 1048576))) MiB"                                                   # Ex: BackupFileSizeMic='45,483 MiB'
+BackupFileSizeGiB="$(printf "%'d" $((BackupFileSize / 1073741824))) GiB"                                                # Ex: BackupFileSizeGiB='44 GiB'
 DetailsJSONBackup='{ "reporter":"'$ScriptFullName'", "file-name":"'$BackupName'", "num-bytes": '${BackupFileSize:-0}' }'
-DetailsTextBackup="File name:    \"$BackupName\"${NL}"
-DetailsTextBackup+="File size:    $BackupFileSizeGiB${NL}"
-DetailsTextBackup+="Time taken:   ${TimeTakenTimeBackup/0 hour /}"
-DetailsTextBackup+="Ver. in file: $GitlabVersionInFile${NL}"
-DetailsTextBackup+="Time taken:   ${TimeTakenTimeBackup/0 hour /}"
+DetailsTextBackup="File name:        $BackupName$NL"
+DetailsTextBackup+="File size:        $BackupFileSizeGiB$NL"
+DetailsTextBackup+="Version in file:  $GitlabVersionInFile$NL"
+DetailsTextBackup+="Time taken:       ${TimeTakenTimeBackup/0 hour /}"
 
 if [ $ESbackup -eq 0 ]; then
     notify "/app/gitlab/backup" "Backup of gitlab performed successfully in ${TimeTakenTimeBackup/0 hour /}" "GOOD" "$DetailsJSONBackup"
@@ -133,7 +133,7 @@ RsyncConf="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times
 ESrsync2=$?
 EndTimeSync=$(date +%s)
 SecsTimeSync=$((EndTimeSync - StartTimeSync))
-TimeTakenTimeSync="$((SecsTimeSync/3600)) hour $((SecsTimeSync%3600/60)) min $((SecsTimeSync%60)) sec"             # Ex: TimeTakenTimeSync='0 hour 5 min 19 sec'
+TimeTakenRsync="$((SecsTimeSync/3600)) hour $((SecsTimeSync%3600/60)) min $((SecsTimeSync%60)) sec"                      # Ex: TimeTakenRsync='0 hour 5 min 19 sec'
 
 # Sum the number of files and bytes
 BytesData=$(echo "$RsyncData" | grep -oE "^sent [0-9,]* bytes" | awk '{print $2}' | sed 's/,//g')
@@ -147,14 +147,14 @@ DetailsTextRsync="Backup directory:  $LocalBackupDir  ->  $RemoteDataDir${NL}"
 DetailsTextRsync+="Config directory: $LocalConfDir  ->  $RemoteConfDir${NL}"
 DetailsTextRsync+="Number of files:  ${FilesTransferred:-0}${NL}"
 DetailsTextRsync+="Bytes trasferred: $(printf "%'d" $((BytesTransferred / 1048576))) MiB${NL}"
-DetailsTextRsync+="Time taken:       ${TimeTakenTimeSync/0 hour /}"
+DetailsTextRsync+="Time taken:       ${TimeTakenRsync/0 hour /}"
 
 # Notify the CS Monitoring System
 if [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ]; then
-    notify "/app/rsync/backup" "Rsync of git-backup and config to $RemoteHost in ${TimeTakenTimeSync/0 hour /}" "GOOD" "$DetailsJSONRsync"
+    notify "/app/rsync/backup" "Rsync of git-backup and config to $RemoteHost in ${TimeTakenRsync/0 hour /}" "GOOD" "$DetailsJSONRsync"
     RsyncResult="successful"
 else
-    notify "/app/rsync/backup" "Rsync of git-backup to $RemoteHost FAILED (time: ${TimeTakenTimeSync/0 hour /})" "CRIT" "$DetailsJSONRsync"
+    notify "/app/rsync/backup" "Rsync of git-backup to $RemoteHost FAILED (time: ${TimeTakenRsync/0 hour /})" "CRIT" "$DetailsJSONRsync"
     RsyncResult="unsuccessful"
 fi
 
