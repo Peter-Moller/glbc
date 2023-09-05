@@ -25,7 +25,7 @@ GitlabImportLog=/var/tmp/gitlab_importlogg_$(date +%F).txt
 GitlabReconfigureLog=/var/tmp/gitlab_reconfigurelogg_$(date +%F).txt
 GitlabVerifyLog=/var/tmp/gitlab_verifylogg_$(date +%F).txt
 NL=$'\n'
-FormatStr="%-19s%-60s"
+FormatStr="%-19s%-50s"
 source /opt/monitoring/monitor.config   # <- is this needed? TODO!
 
 
@@ -209,8 +209,8 @@ if [ -n "$RemoteFile" ]; then
             MailBodyStr+="$NL"
             MailBodyStr+="Gitlab restored ${RestoreStatus}.${NL}"
             MailBodyStr+="$NL"
-            MailBodyStr+="Details:${NL}"
-            MailBodyStr+="---------------------------${NL}"
+            MailBodyStr+="Details:$NL"
+            MailBodyStr+="=================================================$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}:$RemotePath")$NL"
