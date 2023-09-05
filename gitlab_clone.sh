@@ -90,12 +90,12 @@ else
 fi
 RemoteFile="$(echo "$RemoteFiles" | grep "_${TodayDate}_" 2>/dev/null | head -1)"
 # Ex: RemoteFile='99134120 -rw-------  1 username  staff  50756669440 2023-08-31 04:38 /some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
-RemoteFileName="$(echo "$RemoteFile" | awk '{print $NF}')"         # Ex: RemoteFileName='/some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
-BackupFile="$(basename "$RemoteFileName" 2>/dev/null)"             # Ex: BackupFile='1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
-FileSize=$(echo "$RemoteFile" | awk '{print $6}')                  # Ex: FileSize=50756669440
-FileSizeMiB="$(printf "%'d" $((FileSize / 1048576))) MiB"          # Ex: FileSizeMiB='48,405 MiB'
-FileSizeGiB="$(printf "%'d" $((FileSize / 1073741824))) GiB"       # Ex: FileSizeGiB='47 GiB'
-BackupTime="$(echo "$RemoteFile" | awk '{print $7" "$8}')"         # Ex: BackupTime='2023-08-31 04:38'
+RemoteFileName="$(echo "$RemoteFile" | awk '{print $NF}')"                     # Ex: RemoteFileName='/some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
+BackupFile="$(basename "$RemoteFileName" 2>/dev/null)"                         # Ex: BackupFile='1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
+FileSize=$(echo "$RemoteFile" | awk '{print $6}')                              # Ex: FileSize=50756669440
+FileSizeMiB="$(printf "%'d" $((FileSize / 1048576))) MiB"                      # Ex: FileSizeMiB='48,405 MiB'
+FileSizeGiB="$(printf "%'d" $(( $((FileSize+536870912)) / 1073741824))) GiB"   # Ex: FileSizeGiB='47 GiB'
+BackupTime="$(echo "$RemoteFile" | awk '{print $7" "$8}')"                     # Ex: BackupTime='2023-08-31 04:38'
 
 # Get the amount of storage available locally:
 SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')  # Ex: SpaceAvailable='301852954624'
@@ -241,6 +241,7 @@ if [ -n "$RemoteFile" ]; then
         else
             # Meddela monitor-systemet att det inte gick bra
             notify "/app/gitlab/restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp" "CRIT" "$DetailStrJSON"
+            MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL"
             echo "Backup file could not be retrieved from ${RemoteHost}:$RemotePath for server $GitServer. No restore performed. Error: ${ES_scp}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             # Start gitlab again:
             docker restart gitlab
@@ -248,20 +249,25 @@ if [ -n "$RemoteFile" ]; then
     else
         # Not enough space available on local disk
         DetailStrJSON='{ "filename": "'$BackupFile'", "filesize": "'$((FileSize / 1048576))' MiB", "available_local_space": "'$((SpaceAvailable / 1048576))' MiB" }'
-        DetailStrText="Filename: \"$BackupFile\"${NL}"
-        DetailStrText+="Filesize: $(printf "%'d" $((FileSize / 1048576))) MiB${NL}"
-        DetailStrText+="Available local space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
+        MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL"
+        MailBodyStr+="Insufficient space to perform the restore$NL$NL"
+        MailBodyStr+="Filename:        $BackupFile$NL"
+        MailBodyStr+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
+        MailBodyStr+="Available space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
         notify "/app/gitlab/restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
-        echo "Insufficient space to perform the restore${NL}${NL}${DetailStrText}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+        echo "$DetailStrText" | mail -s "GitLab on $GitServer NOT restored" $Recipient
     fi
 else
     # File not found on $RemoteHost
     DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
-    DetailStrText="Today date: \"$TodayDate\"${NL}"
-    DetailStrText+="Remote host: $RemoteHost${NL}${NL}"
-    DetailStrText+="Files on server:${NL}$RemoteFiles"
+    MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL$NL"
+    MailBodyStr+="No file found on $RemoteHost$NL$NL"
+    MailBodyStr+="Today date:  $TodayDate$NL"
+    MailBodyStr+="Remote host: $RemoteHost$NL$NL"
+    MailBodyStr+="Files on server:$NL"
+    MailBodyStr+="$RemoteFiles"
     notify "/app/gitlab/restored" "No file found on $RemoteHost" "CRIT" "$DetailStrJSON"
-    echo "No file found on $RemoteHost${NL}${NL}${DetailStrText}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+    echo "$DetailStrText" | mail -s "GitLab on $GitServer NOT restored" $Recipient
 fi
 
 # Städa undan filer som är äldre än 3 dagar
