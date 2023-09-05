@@ -101,8 +101,8 @@ if [ -n "$BackupNameTmp" ]; then
 else
     BackupName="probably_broken_$(date +%F)_gitlab_backup.tar"
 fi
-GitlabVersionInFile="$(tar -xOf "$BackupName" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')" # Ex: GitlabVersionInFile=16.2.4
-BackupFileSize=$(find /opt/gitlab/data/backups/"$BackupName" -exec ls -ls {} \; | awk '{print $6}')                     # Ex: BackupFileSize='47692830720'
+GitlabVersionInFile="$(tar -xOf "/opt/gitlab/data/backups/$BackupName" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')" # Ex: GitlabVersionInFile=16.2.4
+BackupFileSize=$(find "/opt/gitlab/data/backups/$BackupName" -exec ls -ls {} \; | awk '{print $6}')                     # Ex: BackupFileSize='47692830720'
 BackupFileSizeMiB="$(printf "%'d" $((BackupFileSize / 1048576))) MiB"                                                   # Ex: BackupFileSizeMic='45,483 MiB'
 BackupFileSizeGiB="$(printf "%'d" $(( $((FileSize+536870912)) / 1073741824))) GiB"                                      # Ex: BackupFileSizeGiB='47 GiB'
 DetailsJSONBackup='{ "reporter":"'$ScriptFullName'", "file-name":"'$BackupName'", "num-bytes": '${BackupFileSize:-0}' }'
@@ -164,10 +164,10 @@ fi
 
 MailReport="Report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}${NL}"
 MailReport+="BACKUP of $GitServer:${NL}"
-MailReport+="==============================${NL}"
+MailReport+="=================================================$NL"
 MailReport+="$DetailsTextBackup${NL}${NL}"
 MailReport+="RSYNC to $RemoteHost:${NL}"
-MailReport+="==============================${NL}"
+MailReport+="=================================================$NL"
 MailReport+="$DetailsTextRsync"
 if [ "$BackupResult" = "successful" ] && [ "$RsyncResult" = "successful" ]; then
     Status="backup & rsync both successful"
