@@ -198,14 +198,14 @@ if [ -n "$RemoteFile" ]; then
             End=$(date +%s)
             Secs=$((End - Start))
             TimeTaken="$((Secs/3600)) hour $((Secs%3600/60)) min $((Secs%60)) sec"
-            SpaceAvailableAfterRestore=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')            # Ex: SpaceAvailableAfterRestore=280322433024A
-            SpaceAvailableAfterRestoreGiB="$(printf "%'d" $((SpaceAvailableAfterRestore / 1073741824))) GiB"      # Ex: SpaceAvailableAfterRestoreGiB='261 GiB'
+            #SpaceAvailableAfterRestore=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')            # Ex: SpaceAvailableAfterRestore=280322433024A
+            SpaceAvailableAfterRestoreGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"      # Ex: SpaceAvailableAfterRestoreGiB='261 GiB'
 
             # Meddela monitor-systemet att det är gjort
             notify "/app/gitlab/restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
 
             # Skapa rapport
-            MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")${NL}"
+            MailBodyStr="Report from $ReplicaServer (script: \"$ScriptFullName\")${NL}"
             MailBodyStr+="$NL"
             MailBodyStr+="Gitlab restored ${RestoreStatus}.${NL}"
             MailBodyStr+="$NL"
@@ -215,15 +215,16 @@ if [ -n "$RemoteFile" ]; then
             MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}:$RemotePath")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Backup time:" "$BackupTime (end)")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Restore time:" "$RestoreTimeStart (start)")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Time taken:" "${TimeTaken/0 hour /}")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Details, import:" "$GitlabImportLog")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Details, reconf.:" "$GitlabReconfigureLog")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Details, verify:" "$GitlabVerifyLog")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Details:" " ")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "- reconfigure:" "$GitlabReconfigureLog")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "- verify:" "$GitlabVerifyLog")$NL"
             if [ $ES_restore -ne 0 ]; then
                 MailBodyStr+="${NL}${NL}ERROR:${NL}"
                 MailBodyStr+="$ErrorText${NL}"
