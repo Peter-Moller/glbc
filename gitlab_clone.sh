@@ -100,7 +100,7 @@ BackupTime="$(echo "$RemoteFile" | awk '{print $7" "$8}')"         # Ex: BackupT
 # Get the amount of storage available locally:
 SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')  # Ex: SpaceAvailable='301852954624'
 # What version og GitLab is running (prior to restore)
-RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\r')"   # Ex: RunningVersion='gitlab-ce 16.3.0'
+RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\r' | tr -d '\n')"   # Ex: RunningVersion='gitlab-ce 16.3.0'
 
 ScriptNameLocation
 
@@ -211,7 +211,7 @@ if [ -n "$RemoteFile" ]; then
             MailBodyStr+="$NL"
             MailBodyStr+="Details:${NL}"
             MailBodyStr+="---------------------------${NL}"
-            MailBodyStr+="$(printf "$FormatStr\n" "Running ver.:" "$RunningVersion")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}:$RemotePath")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
