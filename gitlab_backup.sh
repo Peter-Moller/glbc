@@ -104,7 +104,7 @@ fi
 GitlabVersionInFile="$(tar -xOf "$BackupName" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')" # Ex: GitlabVersionInFile=16.2.4
 BackupFileSize=$(find /opt/gitlab/data/backups/"$BackupName" -exec ls -ls {} \; | awk '{print $6}')                     # Ex: BackupFileSize='47692830720'
 BackupFileSizeMiB="$(printf "%'d" $((BackupFileSize / 1048576))) MiB"                                                   # Ex: BackupFileSizeMic='45,483 MiB'
-BackupFileSizeGiB="$(printf "%'d" $((BackupFileSize / 1073741824))) GiB"                                                # Ex: BackupFileSizeGiB='44 GiB'
+BackupFileSizeGiB="$(printf "%'d" $(( $((FileSize+536870912)) / 1073741824))) GiB"                                      # Ex: BackupFileSizeGiB='47 GiB'
 DetailsJSONBackup='{ "reporter":"'$ScriptFullName'", "file-name":"'$BackupName'", "num-bytes": '${BackupFileSize:-0}' }'
 DetailsTextBackup="File name:        $BackupName$NL"
 DetailsTextBackup+="File size:        $BackupFileSizeGiB$NL"
