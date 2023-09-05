@@ -174,7 +174,7 @@ if [ "$BackupResult" = "successful" ] && [ "$RsyncResult" = "successful" ]; then
 else
     Status="backup: ${BackupResult}; rsync: ${RsyncResult}"
 fi
-echo "$MailText" | mail -s "${GitServer}: $Status" $Recipient
+echo "$MailReport" | mail -s "${GitServer}: $Status" $Recipient
 
 
 # Remove the block against reboot:
