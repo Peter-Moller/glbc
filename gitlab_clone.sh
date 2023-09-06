@@ -84,9 +84,9 @@ SleepWait() {
 # Use specified listing to get date and time of backup.
 # Note: on macOS, this is '-D "format"'. On Linux, the same is done with '--time-style=full-iso'
 if [ "$RemoteHostKind" = "linux" ]; then
-    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst --time-style=full-iso $RemotePath/*_gitlab_backup.tar")"
+    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst --time-style=full-iso $RemotePath/data/*_gitlab_backup.tar")"
 else
-    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemotePath/*_gitlab_backup.tar")"
+    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemotePath/data/*_gitlab_backup.tar")"
 fi
 RemoteFile="$(echo "$RemoteFiles" | grep "_${TodayDate}_" 2>/dev/null | head -1)"
 # Ex: RemoteFile='99134120 -rw-------  1 username  staff  50756669440 2023-08-31 04:38 /some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
