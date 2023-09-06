@@ -172,7 +172,6 @@ if [ -n "$RemoteFile" ]; then
                 GitlabImportlogg="$(tr -d '\r' < "$GitlabImportLog" | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | awk '{printf "%s\\n", $0}')"
                 DetailStrJSON='{ "reporter":"'$ScriptFullName'", "filename": "'$BackupFile'", "num-bytes": '$FileSize', "gitlab_importlogg":"'$GitlabImportlogg'" }'
                 ErrorText="$(cat $GitlabImportLog | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | grep -Ev " Deleting |^\s*$|Unpacking backup|Cleaning up|Transfering ownership")"
-                DetailStrText="Reporter: \"$ScriptFullName\"${NL}Filename: \"$BackupFile\"${NL}Filesize: $(printf "%'d" $((FileSize / 1048576))) MiB${NL}${NL}ERROR:${NL}$ErrorText"
             fi
 
             echo "reconfigure of gitlab after restore" > $StopRebootFile
@@ -256,7 +255,7 @@ if [ -n "$RemoteFile" ]; then
         MailBodyStr+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
         MailBodyStr+="Available space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
         notify "/app/gitlab/restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
-        echo "$DetailStrText" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+        echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
     fi
 else
     # File not found on $RemoteHost
@@ -268,7 +267,7 @@ else
     MailBodyStr+="Files on server:$NL"
     MailBodyStr+="$RemoteFiles"
     notify "/app/gitlab/restored" "No file found on $RemoteHost" "CRIT" "$DetailStrJSON"
-    echo "$DetailStrText" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+    echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
 fi
 
 # Städa undan filer som är äldre än 3 dagar
