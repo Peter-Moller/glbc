@@ -218,7 +218,7 @@ if [ -n "$RemoteFile" ]; then
             MailBodyStr+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB")$NL"
+            MailBodyStr+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB remaining on $LocalBackupDir")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "Details:" " ")$NL"
             MailBodyStr+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
