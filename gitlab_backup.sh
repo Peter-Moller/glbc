@@ -34,7 +34,10 @@ else
     echo "Settings file not found. Will exit!"
     exit 1
 fi
-  
+
+RemoteDataDir="$RemotePath/data"
+RemoteConfDir="$RemotePath/config"
+ 
 NL=$'\n'
 export LC_ALL=en_US.UTF-8
 
