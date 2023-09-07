@@ -42,6 +42,8 @@ DeleteFilesNumDays=2
 
 ## Output
 
+The scripts will send reports to a email (if given in the settings file) after processing is done.
+
 ### gitlab_backup.sh
 ```text
 Backup report from git.dns.name (script: "/home/username/glbc/gitlab_backup.sh") at 2023-09-07 04:56 CEST

@@ -231,9 +231,9 @@ if [ -n "$RemoteFile" ]; then
 
             # Mejla rapporten
             if [ $ES_restore -eq 0 ]; then
-                echo "$MailBodyStr" | mail -s "GitLab on $GitServer restored" $Recipient
+                [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer restored" $Recipient
             else
-                echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+                [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             fi
 
             # radera filen/filerna
@@ -242,7 +242,7 @@ if [ -n "$RemoteFile" ]; then
             # Meddela monitor-systemet att det inte gick bra
             notify "/app/gitlab/restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp" "CRIT" "$DetailStrJSON"
             MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL"
-            echo "Backup file could not be retrieved from ${RemoteHost}:$RemotePath for server $GitServer. No restore performed. Error: ${ES_scp}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+            [[ -n "$Recipient" ]] && echo "Backup file could not be retrieved from ${RemoteHost}:$RemotePath for server $GitServer. No restore performed. Error: ${ES_scp}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             # Start gitlab again:
             docker restart gitlab
         fi
@@ -255,7 +255,7 @@ if [ -n "$RemoteFile" ]; then
         MailBodyStr+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
         MailBodyStr+="Available space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
         notify "/app/gitlab/restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
-        echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+        [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
     fi
 else
     # File not found on $RemoteHost
@@ -267,7 +267,7 @@ else
     MailBodyStr+="Files on server:$NL"
     MailBodyStr+="$RemoteFiles"
     notify "/app/gitlab/restored" "No file found on $RemoteHost" "CRIT" "$DetailStrJSON"
-    echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+    [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
 fi
 
 # Städa undan filer som är äldre än 3 dagar

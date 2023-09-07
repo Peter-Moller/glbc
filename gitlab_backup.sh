@@ -74,9 +74,11 @@ SpaceAvailable=$(df -kB1 "$LocalBackupDir" | grep -Ev "^Fil" | awk '{print $4}')
 if [ $(echo "$SizeLastBackup * 2.3" | bc -l | cut -d\. -f1) -gt $SpaceAvailable ]; then
     DetailsJSON='{ "reporter":"'$ScriptFullName'", "space-available":"'$SpaceAvailable'", "num-bytes-last-backup": '${SizeLastBackup:-0}' }'
     notify "/app/gitlab/backup" "Backup of gitlab cannot be done: not enough space available" "CRIT" "$DetailsJSON"
-    # Send email:
-    echo "Backup of $GitServer cannot be done: not enough space available${NL}Space-available: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB${NL}Last backup:     $(printf "%'d" $((SizeLastBackup / 1048576))) MiB" | mail -s "$GitServer cannot be backed up (not enough space)" $Recipient
-    exit 1
+    if [ -n "$Recipient" ]; then
+        # Send email:
+        echo "Backup of $GitServer cannot be done: not enough space available${NL}Space-available: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB${NL}Last backup:     $(printf "%'d" $((SizeLastBackup / 1048576))) MiB" | mail -s "$GitServer cannot be backed up (not enough space)" $Recipient
+        exit 1
+    fi
 fi
 
 
@@ -181,7 +183,11 @@ if [ "$BackupResult" = "successful" ] && [ "$RsyncResult" = "successful" ]; then
 else
     Status="backup: ${BackupResult}; rsync: ${RsyncResult}"
 fi
-echo "$MailReport" | mail -s "${GitServer}: $Status" $Recipient
+
+# Send mail if address is given
+if [ -n "$Recipient" ]; then
+    echo "$MailReport" | mail -s "${GitServer}: $Status" $Recipient
+fi
 
 
 # Remove the block against reboot:
