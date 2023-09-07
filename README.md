@@ -25,13 +25,12 @@ In order to work, a settings file is required.
 #### .gitlab_backup.settings
 ```bash
 GitServer="git.dns.name"
-MainServer="git"
-ReplicaServer="git-test"
 LocalBackupDir="/opt/gitlab/data/backups"
 LocalConfDir="/opt/gitlab/config"
 RemoteUser="username"
 RemoteHost="storage.dns.name"
-RemotePath="/some/directory/"
+RemoteDataPath="/some/directory/"
+RemoteConfPath="/some/directory/"
 RemoteHostKind=darwin
 BackupSignalFile=/opt/gitlab/embedded/service/gitlab-rails/tmp/backup_restore.pid
 StopRebootFile=/tmp/dont_reboot
