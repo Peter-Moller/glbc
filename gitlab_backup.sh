@@ -35,9 +35,6 @@ else
     exit 1
 fi
 
-RemoteDataDir="$RemotePath/data"
-RemoteConfDir="$RemotePath/config"
- 
 NL=$'\n'
 export LC_ALL=en_US.UTF-8
 
@@ -135,11 +132,17 @@ fi
 StartTimeSync=$(date +%s)
 # Sync the database backup
 echo "rsync of backup" > $StopRebootFile
-RsyncData="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times -e ssh "$LocalBackupDir"/ "$RemoteUser"@"$RemoteHost":"$RemoteDataDir"/)"
+RsyncData="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times -e ssh "$LocalBackupDir"/ "$RemoteUser"@"$RemoteHost":"$RemoteDataPath"/)"
 ESrsync1=$?
+[[ $ESrsync1 -ne 0 ]] && ErrortextSync="$LocalBackupDir could not be rsynced to $RemoteHost:$RemoteDataPath$NL"
 # Sync the config directory
-RsyncConf="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times -e ssh "$LocalConfDir"/ "$RemoteUser"@"$RemoteHost":"$RemoteConfDir"/)"
+RsyncConf="$(/usr/bin/rsync --verbose --archive --delete --perms --group --times -e ssh "$LocalConfDir"/ "$RemoteUser"@"$RemoteHost":"$RemoteConfPath"/)"
 ESrsync2=$?
+[[ $ESrsync2 -ne 0 ]] && ErrortextSync+="$LocalConfDir could not be rsynced to $RemoteHost:$RemoteConfPath$NL"
+# Copy the docker-compose.yaml-file
+ScpDockerYaml="$(scp -p "/opt/gitlab/docker-compose.yaml" "$RemoteUser@$RemoteHost:$RemoteConfPath")"
+ESScp=$?
+[[ $ESScp -ne 0 ]] && ErrortextSync+="/opt/gitlab/docker-compose.yaml could not be copied with scp to $RemoteHost:$RemoteConfPath$NL"
 EndTimeSync=$(date +%s)
 SecsTimeSync=$((EndTimeSync - StartTimeSync))
 TimeTakenRsync="$((SecsTimeSync/3600)) hour $((SecsTimeSync%3600/60)) min $((SecsTimeSync%60)) sec"               # Ex: TimeTakenRsync='0 hour 5 min 19 sec'
@@ -151,15 +154,15 @@ BytesTransferred=$((${BytesData:-0} + ${BytesConf:-0}))
 FilesData=$(echo "$RsyncData" | grep -vcE "^building file list |^\.\/$|^$|^sent |^total|\/$")
 FilesConf=$(echo "$RsyncConf" | grep -vcE "^building file list |^\.\/$|^$|^sent |^total|\/$")
 FilesTransferred=$((${FilesData:-0} + ${FilesConf:-0}))
-DetailsJSONRsync='{"remote-dir-data":"'$RemoteDataDir'","remote-dir-conf":"'$RemoteConfDir'","reporter":"'$ScriptFullName'","rsync-stats": { "files":'${FilesTransferred:-0}', "bytes": '${BytesTransferred:-0}', "time": '${SecsTimeSync:-0}'}}'
-DetailsTextRsync="Backup directory: $LocalBackupDir  ->  $RemoteDataDir${NL}"
-DetailsTextRsync+="Config directory: $LocalConfDir  ->  $RemoteConfDir${NL}"
+DetailsJSONRsync='{"remote-dir-data":"'$RemoteDataPath'","remote-dir-conf":"'$RemoteConfPath'","reporter":"'$ScriptFullName'","rsync-stats": { "files":'${FilesTransferred:-0}', "bytes": '${BytesTransferred:-0}', "time": '${SecsTimeSync:-0}'}}'
+DetailsTextRsync="Backup directory: $LocalBackupDir  ->  $RemoteDataPath${NL}"
+DetailsTextRsync+="Config directory: $LocalConfDir  ->  $RemoteConfPath${NL}"
 DetailsTextRsync+="Number of files:  ${FilesTransferred:-0}${NL}"
 DetailsTextRsync+="Bytes trasferred: $(printf "%'d" $((BytesTransferred / 1048576))) MiB${NL}"
 DetailsTextRsync+="Time taken:       ${TimeTakenRsync/0 hour /}"
 
 # Notify the CS Monitoring System
-if [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ]; then
+if [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ] && [ $ESScp -eq 0 ]; then
     notify "/app/rsync/backup" "Rsync of git-backup and config to $RemoteHost in ${TimeTakenRsync/0 hour /}" "GOOD" "$DetailsJSONRsync"
     RsyncResult="successful"
 else
@@ -178,6 +181,10 @@ MailReport+="$DetailsTextBackup${NL}${NL}"
 MailReport+="RSYNC to $RemoteHost:${NL}"
 MailReport+="=================================================$NL"
 MailReport+="$DetailsTextRsync"
+if [ -n "$ErrortextSync" ]; then
+    MailReport+="${NL}${NL}However, there were problems transferring some files:"
+    MailReport+="$ErrortextSync"
+fi
 if [ "$BackupResult" = "successful" ] && [ "$RsyncResult" = "successful" ]; then
     Status="backup & rsync both successful"
 else
