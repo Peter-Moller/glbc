@@ -115,7 +115,7 @@ DetailsTextBackup="File name:        $BackupName$NL"
 DetailsTextBackup+="File size:        $BackupFileSizeGiB$NL"
 DetailsTextBackup+="Version in file:  $GitlabVersionInFile$NL"
 DetailsTextBackup+="Time taken:       ${TimeTakenBackup/0 hour /}$NL"
-DetailsTextBackup+="Space:            $SpaceAvailableAfterBackupGiB remaining on disk $LocalBackupDir"
+DetailsTextBackup+="Space:            $SpaceAvailableAfterBackupGiB remaining on $LocalBackupDir"
 
 if [ $ESbackup -eq 0 ]; then
     notify "/app/gitlab/backup" "Backup of gitlab performed successfully in ${TimeTakenBackup/0 hour /}" "GOOD" "$DetailsJSONBackup"
@@ -168,7 +168,7 @@ fi
 # ===========================================================
 # 5.  S E N D    E M A I L
 
-MailReport="Report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}${NL}"
+MailReport="Backup report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}${NL}"
 MailReport+="BACKUP of $GitServer:${NL}"
 MailReport+="=================================================$NL"
 MailReport+="$DetailsTextBackup${NL}${NL}"
