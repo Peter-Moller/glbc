@@ -204,7 +204,7 @@ if [ -n "$RemoteFile" ]; then
             notify "/app/gitlab/restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
 
             # Skapa rapport
-            MailBodyStr="Restore report from $ReplicaServer (script: \"$ScriptFullName\")${NL}"
+            MailBodyStr="Restore report from $ReplicaServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
             MailBodyStr+="$NL"
             MailBodyStr+="Gitlab restored ${RestoreStatus}.${NL}"
             MailBodyStr+="$NL"
