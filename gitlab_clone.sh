@@ -9,7 +9,7 @@
 # 1. Check to see that there is an applicable file on the file server
 # 2. Make sure there is sufficient space available
 # 3. Fetch the file from the file server using 'scp'
-# 4. Also fetch nessecary config files (currently fetched from the main server). TODO!
+# 4. Also fetch nessecary config files
 # 5. Do a restore (including verification)
 # 6. Email report
 #
@@ -26,7 +26,6 @@ GitlabReconfigureLog=/var/tmp/gitlab_reconfigurelogg_$(date +%F).txt
 GitlabVerifyLog=/var/tmp/gitlab_verifylogg_$(date +%F).txt
 NL=$'\n'
 FormatStr="%-19s%-50s"
-source /opt/monitoring/monitor.config   # <- is this needed? TODO!
 
 
 # Read nessesary settings file. Exit if it’s not found
@@ -84,9 +83,9 @@ SleepWait() {
 # Use specified listing to get date and time of backup.
 # Note: on macOS, this is '-D "format"'. On Linux, the same is done with '--time-style=full-iso'
 if [ "$RemoteHostKind" = "linux" ]; then
-    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst --time-style=full-iso $RemotePath/data/*_gitlab_backup.tar")"
+    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst --time-style=full-iso $RemoteDataPath/*_gitlab_backup.tar")"
 else
-    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemotePath/data/*_gitlab_backup.tar")"
+    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemoteDataPath/data/*_gitlab_backup.tar")"
 fi
 RemoteFile="$(echo "$RemoteFiles" | grep "_${TodayDate}_" 2>/dev/null | head -1)"
 # Ex: RemoteFile='99134120 -rw-------  1 username  staff  50756669440 2023-08-31 04:38 /some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
@@ -140,104 +139,120 @@ if [ -n "$RemoteFile" ]; then
             rm -rf data/*
             mv _backups data/backups
 
-            # Copy everything from the config directory on the main server: TODO!
+            # Copy everything from the config directory:
             cd config || exit 1
-            scp -p -P 2222 $MainServer.cs.lth.se:/opt/gitlab/config/gitlab-secrets.json .
-            scp -p -P 2222 $MainServer.cs.lth.se:'/opt/gitlab/config/ssh_*' .
-            scp -p -P 2222 $MainServer.cs.lth.se:/opt/gitlab/docker-compose.yaml /opt/gitlab/docker-compose.yaml
+            scp -p "$RemoteHost:$RemoteConfPath/gitlab-secrets.json" .
+            ESscp1=$?
+            [[ $ESscp1 -ne 0 ]] && ErrortextScp="$RemoteHost:$RemoteConfPath/gitlab-secrets.json$NL"
+            scp -p "$RemoteHost:$RemoteConfPath/ssh_*" .
+            ESscp2=$?
+            [[ $ESscp2 -ne 0 ]] && ErrortextScp+="$RemoteHost:$RemoteConfPath/ssh-files$NL"
+            scp -p "$RemoteHost:$RemoteConfPath/docker-compose.yaml" /opt/gitlab/docker-compose.yaml
+            ESscp3=$?
+            [[ $ESscp3 -ne 0 ]] && ErrortextScp+="$RemoteHost:$RemoteConfPath/docker-compose.yaml$NL"
+            ESscp=$((ESscp1+ESscp2+ESscp3))
 
-            # Skapa en ny, tom instans:
-            cd /opt/gitlab/ || exit 1
-            docker compose up --force-recreate -d
+            # Only continue if we got these files
+            if [ $ESscp -eq 0 ]; then
 
-            # Wait until it's up
-            SleepWait
+                # Create a new, empty instance
+                cd /opt/gitlab/ || exit 1
+                docker compose up --force-recreate -d
 
-            # Stop 'puma' and 'sidekiq':
-            docker exec -t gitlab gitlab-ctl stop puma
-            docker exec -t gitlab gitlab-ctl stop sidekiq
+                # Wait until it's up
+                SleepWait
 
-            RestoreTimeStart="$(date +%F" "%H:%M)"
+                # Stop 'puma' and 'sidekiq':
+                docker exec -t gitlab gitlab-ctl stop puma
+                docker exec -t gitlab gitlab-ctl stop sidekiq
 
-            # Run the restore. NOTE: "_gitlab_backup.tar" is omitted from the name
-            docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes' &>"$GitlabImportLog"
-            ES_restore=$?
-            if [ $ES_restore -eq 0 ]; then
-                RestoreStatus="successfully"
-                Level="GOOD"
+                RestoreTimeStart="$(date +%F" "%H:%M)"
+
+                # Run the restore. NOTE: "_gitlab_backup.tar" is omitted from the name
+                docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes' &>"$GitlabImportLog"
+                ES_restore=$?
+                if [ $ES_restore -eq 0 ]; then
+                    RestoreStatus="successfully"
+                    Level="GOOD"
+                else
+                    RestoreStatus="unsuccessfully"
+                    Level="CRIT"
+                    # Create a string with the entire message but without printf controls and with \n replaced with '\n':
+                    GitlabImportlogg="$(tr -d '\r' < "$GitlabImportLog" | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | awk '{printf "%s\\n", $0}')"
+                    DetailStrJSON='{ "reporter":"'$ScriptFullName'", "filename": "'$BackupFile'", "num-bytes": '$FileSize', "gitlab_importlogg":"'$GitlabImportlogg'" }'
+                    ErrorText="$(cat $GitlabImportLog | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | grep -Ev " Deleting |^\s*$|Unpacking backup|Cleaning up|Transfering ownership")"
+                fi
+
+                echo "reconfigure of gitlab after restore" > $StopRebootFile
+                docker exec -t gitlab gitlab-ctl reconfigure &>"$GitlabReconfigureLog"
+                # Start gitlab again:
+                docker restart gitlab
+
+                # Wait (restart takes time):
+                SleepWait
+
+                # Check if everything is OK:
+                echo "checking gitlab after restore" > "$StopRebootFile"
+                docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true &>"$GitlabVerifyLog"
+                ES_sanitycheck=$?
+                if [ $ES_sanitycheck -eq 0 ]; then
+                    VerifyStatus="correct"
+                else
+                    VerifyStatus="incorrect"
+                    # Make sure the Level is CRIT even if it was GOOD from the restore
+                    Level="CRIT"
+                fi
+
+                End=$(date +%s)
+                Secs=$((End - Start))
+                TimeTaken="$((Secs/3600)) hour $((Secs%3600/60)) min $((Secs%60)) sec"
+                SpaceAvailableAfterRestoreGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"      # Ex: SpaceAvailableAfterRestoreGiB='261 GiB'
+
+                # Meddela monitor-systemet att det är gjort
+                notify "/app/gitlab/restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
+
+                # Skapa rapport
+                MailBodyStr="Restore report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
+                MailBodyStr+="$NL"
+                MailBodyStr+="Gitlab restored ${RestoreStatus}.${NL}"
+                MailBodyStr+="$NL"
+                MailBodyStr+="Details:$NL"
+                MailBodyStr+="=================================================$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}:$RemotePath")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB remaining on $LocalBackupDir")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Details:" " ")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "- reconfigure:" "$GitlabReconfigureLog")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "- verify:" "$GitlabVerifyLog")$NL"
+                if [ $ES_restore -ne 0 ]; then
+                    MailBodyStr+="${NL}${NL}ERROR:${NL}"
+                    MailBodyStr+="$ErrorText${NL}"
+                fi
+
+                # Mejla rapporten
+                if [ $ES_restore -eq 0 ]; then
+                    [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer restored" $Recipient
+                else
+                    [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+                fi
+
+                # radera filen/filerna
+                rm -f "$BackupFile"
             else
-                RestoreStatus="unsuccessfully"
-                Level="CRIT"
-                # Create a string with the entire message but without printf controls and with \n replaced with '\n':
-                GitlabImportlogg="$(tr -d '\r' < "$GitlabImportLog" | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | awk '{printf "%s\\n", $0}')"
-                DetailStrJSON='{ "reporter":"'$ScriptFullName'", "filename": "'$BackupFile'", "num-bytes": '$FileSize', "gitlab_importlogg":"'$GitlabImportlogg'" }'
-                ErrorText="$(cat $GitlabImportLog | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | grep -Ev " Deleting |^\s*$|Unpacking backup|Cleaning up|Transfering ownership")"
-            fi
-
-            echo "reconfigure of gitlab after restore" > $StopRebootFile
-            docker exec -t gitlab gitlab-ctl reconfigure &>"$GitlabReconfigureLog"
-            # Start gitlab again:
-            docker restart gitlab
-
-            # Wait (restart takes time):
-            SleepWait
-
-            # Check if everything is OK:
-            echo "checking gitlab after restore" > "$StopRebootFile"
-            docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true &>"$GitlabVerifyLog"
-            ES_sanitycheck=$?
-            if [ $ES_sanitycheck -eq 0 ]; then
-                VerifyStatus="correct"
-            else
-                VerifyStatus="incorrect"
-                # Make sure the Level is CRIT even if it was GOOD from the restore
-                Level="CRIT"
-            fi
-
-            End=$(date +%s)
-            Secs=$((End - Start))
-            TimeTaken="$((Secs/3600)) hour $((Secs%3600/60)) min $((Secs%60)) sec"
-            #SpaceAvailableAfterRestore=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')            # Ex: SpaceAvailableAfterRestore=280322433024A
-            SpaceAvailableAfterRestoreGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"      # Ex: SpaceAvailableAfterRestoreGiB='261 GiB'
-
-            # Meddela monitor-systemet att det är gjort
-            notify "/app/gitlab/restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
-
-            # Skapa rapport
-            MailBodyStr="Restore report from $ReplicaServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
-            MailBodyStr+="$NL"
-            MailBodyStr+="Gitlab restored ${RestoreStatus}.${NL}"
-            MailBodyStr+="$NL"
-            MailBodyStr+="Details:$NL"
-            MailBodyStr+="=================================================$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}:$RemotePath")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB remaining on $LocalBackupDir")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "Details:" " ")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "- reconfigure:" "$GitlabReconfigureLog")$NL"
-            MailBodyStr+="$(printf "$FormatStr\n" "- verify:" "$GitlabVerifyLog")$NL"
-            if [ $ES_restore -ne 0 ]; then
-                MailBodyStr+="${NL}${NL}ERROR:${NL}"
-                MailBodyStr+="$ErrorText${NL}"
-            fi
-
-            # Mejla rapporten
-            if [ $ES_restore -eq 0 ]; then
-                [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer restored" $Recipient
-            else
+                MailBodyStr="Restore report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
+                MailBodyStr+="$NL"
+                MailBodyStr+="Could NOT fetch some of the important config files:$NL"
+                MailBodyStr+="$ErrortextScp"
                 [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             fi
-
-            # radera filen/filerna
-            rm -f "$BackupFile"
         else
             # Meddela monitor-systemet att det inte gick bra
             notify "/app/gitlab/restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp" "CRIT" "$DetailStrJSON"
