@@ -43,7 +43,7 @@ DeleteFilesNumDays=2
 ## Output
 
 ### gitlab_backup.sh
-```bash
+```text
 Backup report from git.dns.name (script: "/home/username/glbc/gitlab_backup.sh") at 2023-09-07 04:56 CEST
 
 BACKUP of git.cs.lth.se:
@@ -53,7 +53,7 @@ File size:        48 GiB
 Version in file:  16.3.1
 Backup started:   2023-09-07 04:00 CEST
 Time taken:       36 min 30 sec
-Space:            89 GiB remaining on disk /opt/gitlab/data/backups
+Space:            89 GiB remaining on /opt/gitlab/data/backups
 
 RSYNC to storage.dns.name:
 =================================================
@@ -65,7 +65,7 @@ Time taken:       19 min 37 sec
 ```
 
 ### gitlab_clone.sh
-```bash
+```text
 Restore report from git-test (script: "/home/username/glbc/gitlab_clone.sh")  at 2023-09-07 07:10 CEST
 
 Gitlab restored successfully.
