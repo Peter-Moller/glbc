@@ -67,7 +67,7 @@ Time taken:       19 min 37 sec
 
 ### gitlab_clone.sh
 ```text
-Restore report from git-test (script: "/home/username/glbc/gitlab_clone.sh")  at 2023-09-07 07:10 CEST
+Restore report from git-test.dns.name (script: "/home/username/glbc/gitlab_clone.sh")  at 2023-09-07 07:10 CEST
 
 Gitlab restored successfully.
 
