@@ -114,6 +114,7 @@ DetailsJSONBackup='{ "reporter":"'$ScriptFullName'", "file-name":"'$BackupName'"
 DetailsTextBackup="File name:        $BackupName$NL"
 DetailsTextBackup+="File size:        $BackupFileSizeGiB$NL"
 DetailsTextBackup+="Version in file:  $GitlabVersionInFile$NL"
+DetailsTextBackup+="Backup started:   $(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)$NL"
 DetailsTextBackup+="Time taken:       ${TimeTakenBackup/0 hour /}$NL"
 DetailsTextBackup+="Space:            $SpaceAvailableAfterBackupGiB remaining on $LocalBackupDir"
 
