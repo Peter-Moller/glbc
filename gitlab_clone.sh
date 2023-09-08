@@ -142,13 +142,13 @@ if [ -n "$RemoteFile" ]; then
 
             # Copy everything from the config directory:
             cd config || exit 1
-            scp -p "$RemoteHost:$RemoteConfPath/gitlab-secrets.json" .
+            scp -p "$RemoteUser@$RemoteHost:$RemoteConfPath/gitlab-secrets.json" .
             ESscp1=$?
             [[ $ESscp1 -ne 0 ]] && ErrortextScp="$RemoteHost:$RemoteConfPath/gitlab-secrets.json$NL"
-            scp -p "$RemoteHost:$RemoteConfPath/ssh_*" .
+            scp -p "$RemoteUser@$RemoteHost:$RemoteConfPath/ssh_*" .
             ESscp2=$?
             [[ $ESscp2 -ne 0 ]] && ErrortextScp+="$RemoteHost:$RemoteConfPath/ssh-files$NL"
-            scp -p "$RemoteHost:$RemoteConfPath/docker-compose.yaml" /opt/gitlab/docker-compose.yaml
+            scp -p "$RemoteUser@$RemoteHost:$RemoteConfPath/docker-compose.yaml" /opt/gitlab/docker-compose.yaml
             ESscp3=$?
             [[ $ESscp3 -ne 0 ]] && ErrortextScp+="$RemoteHost:$RemoteConfPath/docker-compose.yaml$NL"
             ESscp=$((ESscp1+ESscp2+ESscp3))
