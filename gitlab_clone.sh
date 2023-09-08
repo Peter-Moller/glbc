@@ -21,9 +21,10 @@ Start=$(date +%s)
 export LC_ALL=en_US.UTF-8
 StopRebootFile=/tmp/dont_reboot
 TodayDate=$(date +%Y_%m_%d)
-GitlabImportLog=/var/tmp/gitlab_importlogg_$(date +%F).txt
-GitlabReconfigureLog=/var/tmp/gitlab_reconfigurelogg_$(date +%F).txt
-GitlabVerifyLog=/var/tmp/gitlab_verifylogg_$(date +%F).txt
+LogDir="/var/tmp"
+GitlabImportLog=$LogDir/gitlab_importlogg_$(date +%F).txt
+GitlabReconfigureLog=$LogDir/gitlab_reconfigurelogg_$(date +%F).txt
+GitlabVerifyLog=$LogDir/gitlab_verifylogg_$(date +%F).txt
 NL=$'\n'
 FormatStr="%-19s%-50s"
 
@@ -103,7 +104,7 @@ RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | h
 
 ScriptNameLocation
 
-# Se till att AutoReboot inte startar om maskinen:
+# Make sure AutoReboot doesn't restart the computer
 echo "gitlab restore" > $StopRebootFile
 
 # Notify the monitoring system that the server is doing something for 60 minutes
@@ -285,8 +286,9 @@ else
     [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
 fi
 
-# Städa undan filer som är äldre än 3 dagar
+# House cleaning
 /usr/bin/find /opt/gitlab/data/backups/ -type f -mtime +3 -exec rm -f {} \;
+/usr/bin/find $LogDir/ -type f -mtime +30 -exec rm -f {} \;
 
-# Ta bort låsningen mot omstart:
+# Remove the block against reboot
 rm $StopRebootFile
