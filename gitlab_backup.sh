@@ -174,7 +174,7 @@ fi
 # ===========================================================
 # 5.  S E N D    E M A I L
 
-MailReport="Backup report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}${NL}"
+MailReport="Backup report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}${NL}"
 MailReport+="BACKUP of $GitServer:${NL}"
 MailReport+="=================================================$NL"
 MailReport+="$DetailsTextBackup${NL}${NL}"

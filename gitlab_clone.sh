@@ -213,7 +213,7 @@ if [ -n "$RemoteFile" ]; then
                 notify "/app/gitlab/restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
 
                 # Skapa rapport
-                MailBodyStr="Restore report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
+                MailBodyStr="Restore report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
                 MailBodyStr+="$NL"
                 MailBodyStr+="Gitlab restored ${RestoreStatus}.${NL}"
                 MailBodyStr+="$NL"
@@ -248,7 +248,7 @@ if [ -n "$RemoteFile" ]; then
                 # radera filen/filerna
                 rm -f "$BackupFile"
             else
-                MailBodyStr="Restore report from $GitServer (script: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
+                MailBodyStr="Restore report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
                 MailBodyStr+="$NL"
                 MailBodyStr+="Could NOT fetch some of the important config files:$NL"
                 MailBodyStr+="$ErrortextScp"
@@ -257,7 +257,7 @@ if [ -n "$RemoteFile" ]; then
         else
             # Meddela monitor-systemet att det inte gick bra
             notify "/app/gitlab/restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp" "CRIT" "$DetailStrJSON"
-            MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL"
+            MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL"
             [[ -n "$Recipient" ]] && echo "Backup file could not be retrieved from ${RemoteHost}:$RemotePath for server $GitServer. No restore performed. Error: ${ES_scp}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             # Start gitlab again:
             docker restart gitlab
@@ -265,7 +265,7 @@ if [ -n "$RemoteFile" ]; then
     else
         # Not enough space available on local disk
         DetailStrJSON='{ "filename": "'$BackupFile'", "filesize": "'$((FileSize / 1048576))' MiB", "available_local_space": "'$((SpaceAvailable / 1048576))' MiB" }'
-        MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL"
+        MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL"
         MailBodyStr+="Insufficient space to perform the restore$NL$NL"
         MailBodyStr+="Filename:        $BackupFile$NL"
         MailBodyStr+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
@@ -276,7 +276,7 @@ if [ -n "$RemoteFile" ]; then
 else
     # File not found on $RemoteHost
     DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
-    MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL$NL"
+    MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL$NL"
     MailBodyStr+="No file found on $RemoteHost (looking at $RemoteDataPath)$NL$NL"
     MailBodyStr+="Today date:  $TodayDate$NL"
     MailBodyStr+="Remote host: $RemoteHost$NL$NL"
