@@ -85,7 +85,7 @@ SleepWait() {
 if [ "$RemoteHostKind" = "linux" ]; then
     RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst --time-style=full-iso $RemoteDataPath/*_gitlab_backup.tar")"
 else
-    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemoteDataPath/data/*_gitlab_backup.tar")"
+    RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemoteDataPath/*_gitlab_backup.tar")"
 fi
 RemoteFile="$(echo "$RemoteFiles" | grep "_${TodayDate}_" 2>/dev/null | head -1)"
 # Ex: RemoteFile='99134120 -rw-------  1 username  staff  50756669440 2023-08-31 04:38 /some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
@@ -276,7 +276,7 @@ else
     # File not found on $RemoteHost
     DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
     MailBodyStr="Report from $GitServer (script: \"$ScriptFullName\")$NL$NL"
-    MailBodyStr+="No file found on $RemoteHost$NL$NL"
+    MailBodyStr+="No file found on $RemoteHost (looking at $RemoteDataPath)$NL$NL"
     MailBodyStr+="Today date:  $TodayDate$NL"
     MailBodyStr+="Remote host: $RemoteHost$NL$NL"
     MailBodyStr+="Files on server:$NL"
