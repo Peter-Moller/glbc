@@ -221,7 +221,7 @@ if [ -n "$RemoteFile" ]; then
                 MailBodyStr+="=================================================$NL"
                 MailBodyStr+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
                 MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}:$RemotePath")$NL"
+                MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}: $RemoteDataPath & $RemoteConfPath")$NL"
                 MailBodyStr+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
                 MailBodyStr+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
                 MailBodyStr+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
@@ -258,7 +258,7 @@ if [ -n "$RemoteFile" ]; then
             # Meddela monitor-systemet att det inte gick bra
             notify "/app/gitlab/restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp" "CRIT" "$DetailStrJSON"
             MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL"
-            [[ -n "$Recipient" ]] && echo "Backup file could not be retrieved from ${RemoteHost}:$RemotePath for server $GitServer. No restore performed. Error: ${ES_scp}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+            [[ -n "$Recipient" ]] && echo "Backup file could not be retrieved from ${RemoteHost}: $RemoteDataPath & $RemoteConfPath for server $GitServer. No restore performed. Error: ${ES_scp}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             # Start gitlab again:
             docker restart gitlab
         fi
@@ -277,7 +277,7 @@ else
     # File not found on $RemoteHost
     DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
     MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL$NL"
-    MailBodyStr+="No file found on $RemoteHost (looking at $RemoteDataPath)$NL$NL"
+    MailBodyStr+="No file found on $RemoteHost (looking at $RemoteDataPath & $RemoteConfPath)$NL$NL"
     MailBodyStr+="Today date:  $TodayDate$NL"
     MailBodyStr+="Remote host: $RemoteHost$NL$NL"
     MailBodyStr+="Files on server:$NL"
