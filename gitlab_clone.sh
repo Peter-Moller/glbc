@@ -20,7 +20,7 @@
 Start=$(date +%s)
 export LC_ALL=en_US.UTF-8
 StopRebootFile=/tmp/dont_reboot
-TodayDate=$(date +%Y_%m_%d)
+TodayDate=$(date +%Y_%m_%d)                                            # Ex: TodayDate=2023_09_12
 LogDir="/var/tmp"
 GitlabImportLog=$LogDir/gitlab_importlogg_$(date +%F).txt
 GitlabReconfigureLog=$LogDir/gitlab_reconfigurelogg_$(date +%F).txt
@@ -282,7 +282,7 @@ else
     MailBodyStr+="Remote host: $RemoteHost$NL$NL"
     MailBodyStr+="Files on server:$NL"
     MailBodyStr+="$RemoteFiles"
-    notify "/app/gitlab/restored" "No file found on $RemoteHost" "CRIT" "$DetailStrJSON"
+    notify "/app/gitlab/restored" "No file for today ($TodayDate) found on $RemoteHost" "CRIT" "$DetailStrJSON"
     [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
 fi
 
