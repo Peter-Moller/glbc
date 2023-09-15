@@ -213,51 +213,53 @@ if [ -n "$RemoteFile" ]; then
                 notify "/app/gitlab/restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
 
                 # Skapa rapport
-                MailBodyStr="Restore report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
-                MailBodyStr+="$NL"
-                MailBodyStr+="Gitlab restored ${RestoreStatus}.${NL}"
-                MailBodyStr+="$NL"
-                MailBodyStr+="Details:$NL"
-                MailBodyStr+="=================================================$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}: $RemoteDataPath & $RemoteConfPath")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB remaining on $LocalBackupDir")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "Details:" " ")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "- reconfigure:" "$GitlabReconfigureLog")$NL"
-                MailBodyStr+="$(printf "$FormatStr\n" "- verify:" "$GitlabVerifyLog")$NL"
+                MailReport="Restore report from $GitServer (reporter: \"$ScriptFullName\") at $(date -d @$RestoreTimeStart +%F" "%H:%M" "%Z)${NL}"
+                MailReport+="$NL"
+                MailReport+="Gitlab restored ${RestoreStatus}.${NL}"
+                MailReport+="$NL"
+                MailReport+="Details:$NL"
+                MailReport+="=================================================$NL"
+                MailReport+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}: $RemoteDataPath & $RemoteConfPath")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
+                MailReport+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB remaining on $LocalBackupDir")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
+                MailReport+="$(printf "$FormatStr\n" "Details:" " ")$NL"
+                MailReport+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
+                MailReport+="$(printf "$FormatStr\n" "- reconfigure:" "$GitlabReconfigureLog")$NL"
+                MailReport+="$(printf "$FormatStr\n" "- verify:" "$GitlabVerifyLog")$NL"
                 if [ $ES_restore -ne 0 ]; then
-                    MailBodyStr+="${NL}${NL}ERROR:${NL}"
-                    MailBodyStr+="$ErrorText${NL}"
+                    MailReport+="${NL}${NL}ERROR:${NL}"
+                    MailReport+="$ErrorText${NL}"
                 fi
+                MailReport+="${NL}${NL}End time: $(date +%F" "%H:%M" "%Z)"
 
                 # Mejla rapporten
                 if [ $ES_restore -eq 0 ]; then
-                    [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer restored" $Recipient
+                    [[ -n "$Recipient" ]] && echo "$MailReport" | mail -s "GitLab on $GitServer restored" $Recipient
                 else
-                    [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+                    [[ -n "$Recipient" ]] && echo "$MailReport" | mail -s "GitLab on $GitServer NOT restored" $Recipient
                 fi
 
                 # radera filen/filerna
                 rm -f "$BackupFile"
             else
-                MailBodyStr="Restore report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)${NL}"
-                MailBodyStr+="$NL"
-                MailBodyStr+="Could NOT fetch some of the important config files:$NL"
-                MailBodyStr+="$ErrortextScp"
-                [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+                MailReport="Restore report from $GitServer (reporter: \"$ScriptFullName\") at $(date -d @$RestoreTimeStart +%F" "%H:%M" "%Z)${NL}"
+                MailReport+="$NL"
+                MailReport+="Could NOT fetch some of the important config files:$NL"
+                MailReport+="$ErrortextScp"
+                MailReport+="${NL}${NL}End time: $(date +%F" "%H:%M" "%Z)"
+                [[ -n "$Recipient" ]] && echo "$MailReport" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             fi
         else
             # Meddela monitor-systemet att det inte gick bra
             notify "/app/gitlab/restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp" "CRIT" "$DetailStrJSON"
-            MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL"
+            MailReport="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date -d @$RestoreTimeStart +%F" "%H:%M" "%Z)$NL"
             [[ -n "$Recipient" ]] && echo "Backup file could not be retrieved from ${RemoteHost}: $RemoteDataPath & $RemoteConfPath for server $GitServer. No restore performed. Error: ${ES_scp}" | mail -s "GitLab on $GitServer NOT restored" $Recipient
             # Start gitlab again:
             docker restart gitlab
@@ -265,25 +267,25 @@ if [ -n "$RemoteFile" ]; then
     else
         # Not enough space available on local disk
         DetailStrJSON='{ "filename": "'$BackupFile'", "filesize": "'$((FileSize / 1048576))' MiB", "available_local_space": "'$((SpaceAvailable / 1048576))' MiB" }'
-        MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL"
-        MailBodyStr+="Insufficient space to perform the restore$NL$NL"
-        MailBodyStr+="Filename:        $BackupFile$NL"
-        MailBodyStr+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
-        MailBodyStr+="Available space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
+        MailReport="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date -d @$RestoreTimeStart +%F" "%H:%M" "%Z)$NL"
+        MailReport+="Insufficient space to perform the restore$NL$NL"
+        MailReport+="Filename:        $BackupFile$NL"
+        MailReport+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
+        MailReport+="Available space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
         notify "/app/gitlab/restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
-        [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+        [[ -n "$Recipient" ]] && echo "$MailReport" | mail -s "GitLab on $GitServer NOT restored" $Recipient
     fi
 else
     # File not found on $RemoteHost
     DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
-    MailBodyStr="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date +%F" "%H:%M" "%Z)$NL$NL"
-    MailBodyStr+="No file found on $RemoteHost (looking at $RemoteDataPath & $RemoteConfPath)$NL$NL"
-    MailBodyStr+="Today date:  $TodayDate$NL"
-    MailBodyStr+="Remote host: $RemoteHost$NL$NL"
-    MailBodyStr+="Files on server:$NL"
-    MailBodyStr+="$RemoteFiles"
+    MailReport="Report from $GitServer (reporter: \"$ScriptFullName\") at $(date -d @$RestoreTimeStart +%F" "%H:%M" "%Z)$NL$NL"
+    MailReport+="No file found on $RemoteHost (looking at $RemoteDataPath & $RemoteConfPath)$NL$NL"
+    MailReport+="Today date:  $TodayDate$NL"
+    MailReport+="Remote host: $RemoteHost$NL$NL"
+    MailReport+="Files on server:$NL"
+    MailReport+="$RemoteFiles"
     notify "/app/gitlab/restored" "No file for today ($TodayDate) found on $RemoteHost" "CRIT" "$DetailStrJSON"
-    [[ -n "$Recipient" ]] && echo "$MailBodyStr" | mail -s "GitLab on $GitServer NOT restored" $Recipient
+    [[ -n "$Recipient" ]] && echo "$MailReport" | mail -s "GitLab on $GitServer NOT restored" $Recipient
 fi
 
 # House cleaning
