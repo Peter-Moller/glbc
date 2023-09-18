@@ -56,7 +56,7 @@ script_location() {
 # Find how the script is launched. Replace newlines with ', '
 script_launcher() {
     # Start by looking at /etc/cron.d
-    ScriptLauncher="$(grep "$ScriptFullName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"  # Ex: ScriptLauncher=/etc/cron.d/postgres
+    ScriptLauncher="$(grep "$ScriptName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"  # Ex: ScriptLauncher=/etc/cron.d/postgres
     # Also, look at the crontabs:
     if [ -z "$ScriptLauncher" ]; then
         ScriptLauncher="$(grep "$ScriptFullName" /var/spool/cron/crontabs/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"
@@ -154,7 +154,7 @@ gitlab_backup() {
     BackupFileSize="$(volume "$BackupFileSizeB")"                                                                      # Ex: BackupFileSize='44 GiB'
     SpaceAvailableAfterBackup=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                          # Ex: SpaceAvailableAfterBackup=67525095424
     SpaceAvailableAfterBackupGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"   # Ex: SpaceAvailableAfterRestoreGiB='261 GiB'
-    DetailsJSONBackup='{ "reporter": "'$ScriptFullName'", "file-name": "'$BackupName'", "num-bytes": '${BackupFileSize:-0}' }'
+    DetailsJSONBackup='{ "reporter": "'$ScriptFullName'", "file-name": "'$BackupName'", "num-bytes": '${BackupFileSizeB:-0}' }'
 
     if [ $ESbackup -eq 0 ]; then
         notify "/app/gitlab/backup" "Backup of gitlab performed successfully in ${TimeTakenBackup/0 hour /}" "GOOD" "$DetailsJSONBackup"
@@ -215,7 +215,7 @@ create_email() {
     MailReport+="=================================================$NL"
     MailReport+="Status:            $StatusBackup$NL"
     MailReport+="File name:         $BackupName$NL"
-    MailReport+="File size:         $BackupFileSizeGiB$NL"
+    MailReport+="File size:         $BackupFileSize$NL"
     MailReport+="Version in file:   $GitlabVersionInFile$NL"
     MailReport+="Backup started:    $(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)$NL"
     MailReport+="Time taken:        ${TimeTakenBackup/0 hour /}$NL"

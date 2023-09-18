@@ -75,7 +75,7 @@ script_name_location() {
 # Find how the script is launched. Replace newlines with ', '
 script_launcher() {
     # Start by looking at /etc/cron.d
-    ScriptLauncher="$(grep "$ScriptFullName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"  # Ex: ScriptLauncher=/etc/cron.d/postgres
+    ScriptLauncher="$(grep "$ScriptName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"  # Ex: ScriptLauncher=/etc/cron.d/postgres
     # Also, look at the crontabs:
     if [ -z "$ScriptLauncher" ]; then
         ScriptLauncher="$(grep "$ScriptFullName" /var/spool/cron/crontabs/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"
