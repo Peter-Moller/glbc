@@ -125,8 +125,8 @@ SleepWait() {
 volume() {
     RawVolume=$1
     KiB="$(printf "%'d" $(( RawVolume / 1024 ))) KiB"
-    MiB="$(printf "%'d" $(( RawVolume / 1048576 ))) MiB"
-    GiB="$(printf "%'d" $(( RawVolume / 1073741824 ))) GiB"
+    MiB="$(printf "%'d" $(( $((RawVolume+524288)) / 1048576 ))) MiB"
+    GiB="$(printf "%'d" $(( $((RawVolume+536870912)) / 1073741824 ))) GiB"
     if [ $(echo "$GiB" | awk '{print $1}') -eq 0 ]; then
         if [ $(echo "$MiB" | awk '{print $1}') -eq 0 ]; then
             echo "$KiB"
