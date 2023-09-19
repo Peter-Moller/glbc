@@ -194,7 +194,7 @@ rsync_backup() {
     FilesData=$(echo "$RsyncData" | grep -vcE "^building file list |^\.\/$|^$|^sent |^total|\/$")
     FilesConf=$(echo "$RsyncConf" | grep -vcE "^building file list |^\.\/$|^$|^sent |^total|\/$")
     FilesNumTransferred=$((${FilesData:-0} + ${FilesConf:-0}))
-    DetailsJSONRsync='{"remote-dir-data":"'$RemoteDataPath'","remote-dir-conf":"'$RemoteConfPath'","reporter":"'$ScriptFullName'","rsync-stats": { "files":'${NumFilesTransferred:-0}', "bytes": '${TransferredB:-0}', "time": '${TimeSyncSec:-0}'}}'
+    DetailsJSONRsync='{"remote-dir-data":"'$RemoteDataPath'","remote-dir-conf":"'$RemoteConfPath'","reporter":"'$ScriptFullName'","rsync-stats": { "files":'${FilesNumTransferred:-0}', "bytes": '${TransferredB:-0}', "time": '${TimeSyncSec:-0}'}}'
 
     # Notify the CS Monitoring System
     if [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ] && [ $ESScp -eq 0 ]; then
@@ -226,7 +226,7 @@ create_email() {
     MailReport+="Status:            $StatusRsync$NL"
     MailReport+="Backup directory:  $LocalBackupDir  →  $RemoteDataPath${NL}"
     MailReport+="Config directory:  $LocalConfDir  →  $RemoteConfPath${NL}"
-    MailReport+="Number of files:   ${NumFilesTransferred:-0}${NL}"
+    MailReport+="Number of files:   ${FilesNumTransferred:-0}${NL}"
     #MailReport+="Bytes trasferred: $(printf "%'d" $((TransferredB / 1048576))) MiB${NL}"
     MailReport+="Volume trasferred: $TransferredVolume$NL"
     MailReport+="Time taken:        ${TimeTakenRsync/0 hour /}"
