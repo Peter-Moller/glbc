@@ -83,6 +83,13 @@ script_launcher() {
 }
 
 
+# House cleaning
+delete_old_files() {
+    /usr/bin/find /opt/gitlab/data/backups/ -type f -mtime +3 -exec rm -f {} \;
+    /usr/bin/find $LogDir/ -type f -mtime +30 -exec rm -f {} \;
+}
+
+
 # Notify the monitoring system that the server is doing something for 60 minutes
 trigger_maintenance() {
     MaintenanceDuration="$1"
@@ -332,6 +339,8 @@ script_name_location
 
 script_launcher
 
+delete_old_files
+
 get_remote_file_data
 
 # Make sure AutoReboot doesn't restart the computer
@@ -407,10 +416,6 @@ else
 fi
 
 send_email
-
-# House cleaning
-/usr/bin/find /opt/gitlab/data/backups/ -type f -mtime +3 -exec rm -f {} \;
-/usr/bin/find $LogDir/ -type f -mtime +30 -exec rm -f {} \;
 
 # Remove the block against reboot
 rm $StopRebootFile
