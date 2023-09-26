@@ -209,7 +209,7 @@ rsync_backup() {
 
 # Create email:
 create_email() {
-    MailReport="Backup report from $GitServer (reporter: \"$ScriptFullName\") at $(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)$NL"
+    MailReport="Backup report from $GitServer at $(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)$NL"
     MailReport+="(script: ${ScriptFullName}, launched by: ${ScriptLauncher:---no launcher detected--})$NL$NL"
     MailReport+="BACKUP of $GitServer:${NL}"
     MailReport+="=================================================$NL"
@@ -224,9 +224,9 @@ create_email() {
     MailReport+="RSYNC to $RemoteHost:${NL}"
     MailReport+="=================================================$NL"
     MailReport+="Status:            $StatusRsync$NL"
-    MailReport+="Backup directory:  $LocalBackupDir  →  $RemoteDataPath${NL}"
-    MailReport+="Config directory:  $LocalConfDir  →  $RemoteConfPath${NL}"
-    MailReport+="Number of files:   ${FilesNumTransferred:-0}${NL}"
+    MailReport+="Backup directory:  $LocalBackupDir  →  $RemoteDataPath$NL"
+    MailReport+="Config directory:  $LocalConfDir  →  $RemoteConfPath$NL"
+    MailReport+="Number of files:   ${FilesNumTransferred:-0}$NL"
     #MailReport+="Bytes trasferred: $(printf "%'d" $((TransferredB / 1048576))) MiB${NL}"
     MailReport+="Volume trasferred: $TransferredVolume$NL"
     MailReport+="Time taken:        ${TimeTakenRsync/0 hour /}"
