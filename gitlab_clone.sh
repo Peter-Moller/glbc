@@ -302,7 +302,7 @@ copy_database() {
 
 # Copy everything from the config directory:
 copy_config() {
-    cd config || exit 1
+    cd "$LocalConfDir" || exit 1
     scp -p "$RemoteUser@$RemoteHost:$RemoteConfPath/gitlab-secrets.json" .
     ES_scp_gitlab_secrets=$?
     [[ $ES_scp_gitlab_secrets -ne 0 ]] && ErrortextScpConfig="$RemoteHost:$RemoteConfPath/gitlab-secrets.json$NL"
@@ -359,7 +359,7 @@ MailReport+="(script: ${ScriptFullName}, launched by: ${ScriptLauncher:---no lau
 # Continue if a file is found on the remote server
 if [ -n "$RemoteFile" ]; then
     # Continue if there’s enough space available
-    if [ $(echo "$FileSize * 2.1" | bc -l | cut -d\. -f1) -lt $SpaceAvailable ]; then
+    if [ $(echo "$FileSize * 1.1" | bc -l | cut -d\. -f1) -lt $SpaceAvailable ]; then
         
         copy_database
 
