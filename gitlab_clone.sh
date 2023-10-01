@@ -368,7 +368,7 @@ if [ -n "$RemoteFile" ]; then
         # Continue if the transfers of both database file and config files were successful
         if [ $ES_scp_database -eq 0 ] && [ $ES_scp_config -eq 0 ]; then
 
-            GitlabVersionInFile="$(tar -xOf "$BackupFile" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')"       # Ex: GitlabVersionInFile=16.2.4
+            GitlabVersionInFile="$(tar -xOf "$LocalBackupDir/$BackupFile" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')"       # Ex: GitlabVersionInFile=16.2.4
 
             # Now delete the current one and prepare for the restore:
             # Stop running instances:
