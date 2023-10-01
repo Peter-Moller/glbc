@@ -27,13 +27,10 @@ GitlabImportLog=$LogDir/gitlab_importlogg_$(date +%F).txt
 GitlabReconfigureLog=$LogDir/gitlab_reconfigurelogg_$(date +%F).txt
 GitlabVerifyLog=$LogDir/gitlab_verifylogg_$(date +%F).txt
 GitlabReadinessURL="https://localhost/-/readiness"
-# Get the amount of storage available locally:
-SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                                         # Ex: SpaceAvailable='301852954624'
 # What version og GitLab is running (prior to restore)
 RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\r' | tr -d '\n')"     # Ex: RunningVersion='gitlab-ce 16.3.0'
 NL=$'\n'
 FormatStr="%-19s%-50s"
-
 
 # Read nessesary settings file. Exit if it’s not found
 if [ -r ~/.gitlab_backup.settings ]; then
@@ -42,6 +39,10 @@ else
     echo "Settings file not found. Will exit!"
     exit 1
 fi
+
+# Get the amount of storage available locally:
+SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                                         # Ex: SpaceAvailable='301852954624'
+
 
 
 #==============================================================================================================
