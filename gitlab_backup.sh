@@ -219,7 +219,7 @@ create_email() {
     MailReport+="Version in file:   $GitlabVersionInFile$NL"
     MailReport+="Backup started:    $(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)$NL"
     MailReport+="Time taken:        ${TimeTakenBackup/0 hour /}$NL"
-    MailReport+="Space:             $SpaceAvailableAfterBackupGiB remaining on $LocalBackupDir"
+    MailReport+="Space:             $SpaceAvailableAfterBackupGiB remaining on $LocalBackupDir (disk: $(df $LocalBackupDir | grep -Ev "^File" | awk '{print $NF}'))"
     MailReport+="$NL$NL"
     MailReport+="RSYNC to $RemoteHost:${NL}"
     MailReport+="=================================================$NL"
