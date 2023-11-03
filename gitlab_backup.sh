@@ -287,7 +287,7 @@ email_html_create() {
         echo '    <p align="left">&nbsp;</p>' >> $EmailTempFile
         echo '    <table id="jobe">' >> $EmailTempFile
         echo "      <thead>" >> $EmailTempFile
-        echo '        <tr><th align="right" colspan="2">Backup of git.cs.lth.se</th></tr>' >> $EmailTempFile
+        echo '        <tr><th align="right" colspan="2">Backup</th></tr>' >> $EmailTempFile
         echo "      </thead>" >> $EmailTempFile
         echo "      <tbody>" >> $EmailTempFile
         if [ "$StatusBackup" = "successful" ]; then
@@ -302,7 +302,7 @@ email_html_create() {
         echo '        <tr><td>Version in file:</td><td>'$GitlabVersionInFile'</td></tr>' >> $EmailTempFile
         echo "        <tr><td>Backup Started:</td><td>$(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)</td></tr>" >> $EmailTempFile
         echo "        <tr><td>Time taken, DB:</td><td>$TimeTakenBackup</td></tr>" >> $EmailTempFile
-        echo "        <tr><td>Space:</td><td>$SpaceAvailableAfterBackupGiB remaining on disk <code>$(df $LocalBackupDir | grep -Ev "^File" | awk '{print $NF}')</code></td></tr>" >> $EmailTempFile
+        echo "        <tr><td>Space:</td><td>$SpaceAvailableAfterBackupGiB remaining on disk <code>$(df $LocalBackupDir | grep -Ev "^File" | awk '{print $NF}')</code> (<code>$(df $LocalBackupDir | grep -Ev "^File" | awk '{print $1}')</code>)</td></tr>" >> $EmailTempFile
         echo "      </tbody>" >> $EmailTempFile
         echo "    </table>" >> $EmailTempFile
         echo "    <p>&nbsp;</p>" >> $EmailTempFile
@@ -329,6 +329,7 @@ email_html_create() {
             done <<< "$RsyncErrList"
             echo "        </table></td></tr>" >> $EmailTempFile
         fi
+        echo "        <tr><td>Remote server:</td><td>$RemoteHost</td></tr>" >> $EmailTempFile
         echo "        <tr><td>Backup directory:</td><td><code>$LocalBackupDir</code>  &#8594;  <code>$RemoteDataPath</code></td></tr>" >> $EmailTempFile
         echo "        <tr><td>Config directory:</td><td><code>$LocalConfDir/</code> &#8594; <code>$RemoteConfPath</code></td></tr>" >> $EmailTempFile
         echo "        <tr><td>Number of files:</td><td>${FilesNumTransferred:-0}</td></tr>" >> $EmailTempFile
