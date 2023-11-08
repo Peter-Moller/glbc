@@ -36,7 +36,15 @@ BackupSignalFile=/opt/gitlab/embedded/service/gitlab-rails/tmp/backup_restore.pi
 StopRebootFile=/tmp/dont_reboot
 Recipient=user@system.dns.name
 DeleteFilesNumDays=2
+ReportHead=https://fileadmin.cs.lth.se/intern/backup/custom_report_head.html
+USE_HTML_EMAIL=true
 ```
+
+A note on the `ReportHead`:  
+
+  * it should contain the first part of the complete html page, from `<!DOCTYPE html...` to `</head>`
+  * the rest will be completed by the script itself (i.e. from `<body>` to `</html>`)
+
 
 
 ## Output
