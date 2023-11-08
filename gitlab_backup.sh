@@ -358,6 +358,14 @@ email_html_create() {
 
 
 # Skicka mejlet
+email_send() {
+    if [ -n "$Recipient" ]; then
+        echo "$MailReport" | mail -s "${GitServer}: $Status" "$Recipient"
+    fi
+}
+
+
+# Skicka mejlet
 email_html_send() {
     if [ -n "$Recipient" ]; then
         cat $EmailTempFile | /sbin/sendmail -t
@@ -395,16 +403,13 @@ gitlab_backup
 
 rsync_backup
 
-#create_email
-
-email_html_create
-
-email_html_send
-
-# Send mail if address is given
-#if [ -n "$Recipient" ]; then
-#    echo "$MailReport" | mail -s "${GitServer}: $Status" $Recipient
-#fi
+if ${USE_HTML_EMAIL:-false}; then
+    email_html_create
+    email_html_send
+else
+    create_email
+    email_send
+fi
 
 # Remove the block against reboot:
 rm $StopRebootFile
