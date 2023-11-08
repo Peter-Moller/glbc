@@ -73,6 +73,9 @@ Bytes trasferred: 49,434 MiB
 Time taken:       19 min 37 sec
 ```
 
+![example of backup email](example_backup.png)
+
+
 ### gitlab_clone.sh
 ```text
 Restore report from git-test.dns.name (script: "/home/username/glbc/gitlab_clone.sh")  at 2023-09-07 07:10 CEST
