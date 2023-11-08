@@ -59,27 +59,16 @@ script_location() {
 # Find how the script is launched. Replace newlines with ', '
 script_launcher() {
     # Start by looking at /etc/cron.d
-    ScriptLauncher="$(grep "$ScriptName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"  # Ex: ScriptLauncher=/etc/cron.d/postgres
+    ScriptLauncher="$(grep "$ScriptName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"                # Ex: ScriptLauncher=/etc/cron.d/postgres
     # Also, look at the crontabs:
     if [ -z "$ScriptLauncher" ]; then
-        ScriptLauncher="$(grep "$ScriptFullName" /var/spool/cron/crontabs/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"
+        ScriptLauncher="$(grep "$ScriptName" /var/spool/cron/crontabs/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"
     fi
-    ScriptLaunchWhenStr="$(grep "$ScriptFullName" "$ScriptLauncher" | awk '{print $1" "$2" "$3" "$4" "$5}')"                       # Ex: ScriptLaunchWhenStr='55 3 * * *'
-    ScriptLaunchDayRaw="$(echo "$ScriptLaunchWhenStr" | awk '{print $5}')"                                                         # Ex: ScriptLaunchDay=Daily
-    case "$ScriptLaunchDayRaw" in
-        "*") ScriptLaunchDay="daily" ;;
-        "0") ScriptLaunchDay="every Sunday";;
-        "1") ScriptLaunchDay="every Monday";;
-        "2") ScriptLaunchDay="every Tuesday";;
-        "3") ScriptLaunchDay="every Wednesday";;
-        "4") ScriptLaunchDay="every Thursday";;
-        "5") ScriptLaunchDay="every Friday";;
-        "6") ScriptLaunchDay="every Saturday";;
-        *)   ScriptLaunchDay="$ScriptLaunchDayRaw";;
-    esac
+    ScriptLaunchWhenStr="$(grep "$ScriptName" "$ScriptLauncher" | grep -Ev "#" | awk '{print $1" "$2" "$3" "$4" "$5}')"            # Ex: ScriptLaunchWhenStr='55 3 * * *'
+    ScriptLaunchDay="$(echo "$ScriptLaunchWhenStr" | awk '{print $5}' | sed 's/*/day/; s/0/Sunday/; s/1/Monday/; s/2/Tuesday/; s/3/Wednesday/; s/4/Thursday/; s/5/Friday/; s/6/Saturday/')"
     ScriptLaunchHour="$(echo "$ScriptLaunchWhenStr" | awk '{print $2}')"                                                           # Ex: ScriptLaunchHour=3
     ScriptLaunchMinute="$(echo "$ScriptLaunchWhenStr" | awk '{print $1}')"                                                         # Ex: ScriptLaunchMinute=55
-    ScriptLaunchText="$(echo Time="$ScriptLaunchDay at $(printf "%02d:%02d" "${ScriptLaunchHour#0}" "${ScriptLaunchMinute#0}")"    # Ex: ScriptLaunchText='daily at 03:55'
+    ScriptLaunchText="$(echo Time="$ScriptLaunchDay at $(printf "%02d:%02d" "${ScriptLaunchHour#0}" "${ScriptLaunchMinute#0}")")"  # Ex: ScriptLaunchText='day at 03:55'
 }
 
 
