@@ -162,7 +162,8 @@ gitlab_backup() {
     #BackupFileSizeGiB="$(printf "%'d" $(( $((BackupFileSize+536870912)) / 1073741824))) GiB"                          # Ex: BackupFileSizeGiB='47 GiB'
     BackupFileSize="$(volume "$BackupFileSizeB")"                                                                      # Ex: BackupFileSize='44 GiB'
     SpaceAvailableAfterBackup=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                          # Ex: SpaceAvailableAfterBackup=67525095424
-    SpaceAvailableAfterBackupGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"   # Ex: SpaceAvailableAfterRestoreGiB='261 GiB'
+    SpaceAfterBackupGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"            # Ex: SpaceAfterBackupGiB='261 GiB'
+    SpaceAfterBackupPercent="$(echo "scale=0; 100 - $(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $5}' | tr -d '%')" | bc -l)%"   # Ex: SpaceAfterBackupPercent=45%
     DetailsJSONBackup='{ "reporter": "'$ScriptFullName'", "file-name": "'$BackupName'", "num-bytes": '${BackupFileSizeB:-0}' }'
 
     if [ $ESbackup -eq 0 ]; then
@@ -233,7 +234,7 @@ create_email() {
     MailReport+="Version in file:   $GitlabVersionInFile$NL"
     MailReport+="Backup started:    $(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)$NL"
     MailReport+="Time taken:        ${TimeTakenBackup/0 hour /}$NL"
-    MailReport+="Space:             $SpaceAvailableAfterBackupGiB remaining on $LocalBackupDir (disk: $(df $LocalBackupDir | grep -Ev "^File" | awk '{print $NF}'))"
+    MailReport+="Space:             $SpaceAfterBackupGiB remaining on $LocalBackupDir (disk: $(df $LocalBackupDir | grep -Ev "^File" | awk '{print $NF}'))"
     MailReport+="$NL$NL"
     MailReport+="RSYNC to $RemoteHost:${NL}"
     MailReport+="=================================================$NL"
@@ -307,7 +308,7 @@ email_html_create() {
         echo '        <tr><td>Version in file:</td><td>'$GitlabVersionInFile'</td></tr>' >> $EmailTempFile
         echo "        <tr><td>Backup Started:</td><td>$(date -d @$StartTimeBackup +%F" "%H:%M" "%Z)</td></tr>" >> $EmailTempFile
         echo "        <tr><td>Time taken, DB:</td><td>$TimeTakenBackup</td></tr>" >> $EmailTempFile
-        echo "        <tr><td>Space:</td><td>$SpaceAvailableAfterBackupGiB remaining on disk <code>$(df $LocalBackupDir | grep -Ev "^File" | awk '{print $NF}')</code> (<code>$(df $LocalBackupDir | grep -Ev "^File" | awk '{print $1}')</code>)</td></tr>" >> $EmailTempFile
+        echo "        <tr><td>Space:</td><td>$SpaceAfterBackupGiB ($SpaceAfterBackupPercent) remaining on disk <code>$(df $LocalBackupDir | grep -Ev "^File" | awk '{print $NF}')</code> (<code>$(df $LocalBackupDir | grep -Ev "^File" | awk '{print $1}')</code>)</td></tr>" >> $EmailTempFile
         echo "      </tbody>" >> $EmailTempFile
         echo "    </table>" >> $EmailTempFile
         echo "    <p>&nbsp;</p>" >> $EmailTempFile
