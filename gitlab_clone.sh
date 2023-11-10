@@ -210,7 +210,7 @@ email_success() {
         echo '    <p align="left">&nbsp;</p>' >> $EmailTempFile
         echo '    <table id="jobe">' >> $EmailTempFile
         echo '      <thead>' >> $EmailTempFile
-        echo '        <tr><th align="right" colspan="2">Backup</th></tr>' >> $EmailTempFile
+        echo '        <tr><th align="right" colspan="2">Details</th></tr>' >> $EmailTempFile
         echo '      </thead>' >> $EmailTempFile
         echo '      <tbody>' >> $EmailTempFile
         echo '        <tr><td>Status:</td><td style="color: '$TextColor';">'$RestoreStatus'</td></tr>' >> $EmailTempFile
