@@ -186,10 +186,12 @@ email_success() {
         MailSubject="GitLab on $GitServer restored"
         RestoreStatus="successfully"
         Level="GOOD"
+        TextColor="green"
     else
         MailSubject="GitLab on $GitServer NOT restored"
         RestoreStatus="unsuccessfully"
         Level="CRIT"
+        TextColor="red"
     fi
     if ${USE_HTML_EMAIL:-false}; then
         echo '<body>' >> $EmailTempFile
@@ -211,11 +213,11 @@ email_success() {
         echo '        <tr><th align="right" colspan="2">Backup</th></tr>' >> $EmailTempFile
         echo '      </thead>' >> $EmailTempFile
         echo '      <tbody>' >> $EmailTempFile
-        echo '        <tr><td>Status:</td><td style="color: green;">'$RestoreStatus'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Status:</td><td style="color: '$TextColor';">'$RestoreStatus'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Running version:</td><td>'$RunningVersion'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Version in file:</td><td>'$GitlabVersionInFile'</td></tr>' >> $EmailTempFile
-        echo '        <tr><td>Source:</td><td>'${RemoteHost}': <code>'$RemoteDataPath'</code> &uml; <code>'$RemoteConfPath'</code></td></tr>' >> $EmailTempFile
-        echo '        <tr><td>Filename:</td><td>'$BackupFile'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Source:</td><td>'${RemoteHost}': <code>'$RemoteDataPath'</code> &amp; <code>'$RemoteConfPath'</code></td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Filename:</td><td><code>'$BackupFile'</code></td></tr>' >> $EmailTempFile
         echo '        <tr><td>Copy time:</td><td>'$CopyTime'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Backup ended:</td><td>'$BackupTime' (end)</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Restore started:</td><td>'$RestoreTimeStart' (start)"</td></tr>' >> $EmailTempFile
@@ -226,7 +228,7 @@ email_success() {
         else
             TextColor="red"
         fi
-        echo '        <tr><td>Verify:</td><td style="color '$TextColor'">'$VerifyStatus'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Verify:</td><td style="color: '$TextColor'">'$VerifyStatus'</td></tr>' >> $EmailTempFile
         echo '        <tr><td colspan="2">Details:</td></tr>' >> $EmailTempFile
         echo '        <tr><td>- import:</td><td><code>'$GitlabImportLog'</code></td></tr>' >> $EmailTempFile
         echo '        <tr><td>- reconfigure:</td><td><code>'$GitlabReconfigureLog'</code></td></tr>' >> $EmailTempFile
