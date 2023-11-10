@@ -220,7 +220,7 @@ email_success() {
         echo '        <tr><td>Filename:</td><td><code>'$BackupFile'</code></td></tr>' >> $EmailTempFile
         echo '        <tr><td>Copy time:</td><td>'$CopyTime'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Backup ended:</td><td>'$BackupTime' (end)</td></tr>' >> $EmailTempFile
-        echo '        <tr><td>Restore started:</td><td>'$RestoreTimeStart' (start)"</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Restore started:</td><td>'$RestoreTimeStart' (start)</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Restore duration:</td><td>'$TimeTaken'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>File size:</td><td>'$FileSizeGiB'</td></tr>' >> $EmailTempFile
         if [ "$VerifyStatus" = "correct" ]; then
