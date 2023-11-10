@@ -19,6 +19,7 @@
 
 # General settings
 Start=$(date +%s)
+now="$(date "+%Y-%m-%d %T %Z")"
 export LC_ALL=en_US.UTF-8
 StopRebootFile=/tmp/dont_reboot
 TodayDate=$(date +%Y_%m_%d)                                                                                            # Ex: TodayDate=2023_09_12
@@ -39,6 +40,8 @@ else
     echo "Settings file not found. Will exit!"
     exit 1
 fi
+LocalBackupMP="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $NF}')"                                        # Ex: LocalBackupMP=/opt
+LocalBackupFS="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $1}')"                                         # Ex: LocalBackupFS=/dev/mapper/vg1-opt
 
 # Get the amount of storage available locally:
 SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                                         # Ex: SpaceAvailable='301852954624'
@@ -76,11 +79,16 @@ script_name_location() {
 # Find how the script is launched. Replace newlines with ', '
 script_launcher() {
     # Start by looking at /etc/cron.d
-    ScriptLauncher="$(grep "$ScriptName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"  # Ex: ScriptLauncher=/etc/cron.d/postgres
+    ScriptLauncher="$(grep "$ScriptName" /etc/cron.d/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"                # Ex: ScriptLauncher=/etc/cron.d/postgres
     # Also, look at the crontabs:
     if [ -z "$ScriptLauncher" ]; then
-        ScriptLauncher="$(grep "$ScriptFullName" /var/spool/cron/crontabs/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"
+        ScriptLauncher="$(grep "$ScriptName" /var/spool/cron/crontabs/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"
     fi
+    ScriptLaunchWhenStr="$(grep "$ScriptName" "$ScriptLauncher" | grep -Ev "#" | awk '{print $1" "$2" "$3" "$4" "$5}')"            # Ex: ScriptLaunchWhenStr='30 6 * * 0'
+    ScriptLaunchDay="$(echo "$ScriptLaunchWhenStr" | awk '{print $5}' | sed 's/*/day/; s/0/Sunday/; s/1/Monday/; s/2/Tuesday/; s/3/Wednesday/; s/4/Thursday/; s/5/Friday/; s/6/Saturday/')"  # Ex: ScriptLaunchDay=Sunday
+    ScriptLaunchHour="$(echo "$ScriptLaunchWhenStr" | awk '{print $2}')"                                                           # Ex: ScriptLaunchHour=6
+    ScriptLaunchMinute="$(echo "$ScriptLaunchWhenStr" | awk '{print $1}')"                                                         # Ex: ScriptLaunchMinute=30
+    ScriptLaunchText="every $ScriptLaunchDay at $(printf "%02d:%02d" "${ScriptLaunchHour#0}" "${ScriptLaunchMinute#0}")"           # Ex: ScriptLaunchText='every Sunday at 06:30'
 }
 
 
@@ -156,6 +164,11 @@ get_remote_file_data() {
     else
         RemoteFiles="$(ssh $RemoteUser@$RemoteHost "ls -lst -D \"%F %H:%M\" $RemoteDataPath/*_gitlab_backup.tar")"
     fi
+    # Ex: RemoteFiles=
+    # '105360000 -rw-------  1 rsync_git  staff  53944320000 2023-11-10 04:57 /Volumes/RAID/Backups/git/data/1699585267_2023_11_10_16.3.6_gitlab_backup.tar
+    #  105358464 -rw-------  1 rsync_git  staff  53943531520 2023-11-09 04:55 /Volumes/RAID/Backups/git/data/1699498912_2023_11_09_16.3.6_gitlab_backup.tar
+    #  105339504 -rw-------  1 rsync_git  staff  53933824000 2023-11-08 10:48 /Volumes/RAID/Backups/git/data/1699433462_2023_11_08_16.3.6_gitlab_backup.tar
+    #  105333280 -rw-------  1 rsync_git  staff  53930639360 2023-11-07 04:59 /Volumes/RAID/Backups/git/data/1699326112_2023_11_07_16.3.6_gitlab_backup.tar'
     RemoteFile="$(echo "$RemoteFiles" | grep "_${TodayDate}_" 2>/dev/null | head -1)"
     # Ex: RemoteFile='99134120 -rw-------  1 username  staff  50756669440 2023-08-31 04:38 /some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
     RemoteFileName="$(echo "$RemoteFile" | awk '{print $NF}')"                     # Ex: RemoteFileName='/some/path/Backups/git/1693447267_2023_08_31_16.2.4_gitlab_backup.tar'
@@ -169,25 +182,6 @@ get_remote_file_data() {
 
 # Create email for successful restore:
 email_success() {
-    # Skapa rapport
-    MailReport+="Gitlab restored ${RestoreStatus}.${NL}"
-    MailReport+="$NL"
-    MailReport+="Details:$NL"
-    MailReport+="=================================================$NL"
-    MailReport+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}: $RemoteDataPath & $RemoteConfPath")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
-    MailReport+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAvailableAfterRestoreGiB remaining on $LocalBackupDir")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
-    MailReport+="$(printf "$FormatStr\n" "Details:" " ")$NL"
-    MailReport+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
-    MailReport+="$(printf "$FormatStr\n" "- reconfigure:" "$GitlabReconfigureLog")$NL"
-    MailReport+="$(printf "$FormatStr\n" "- verify:" "$GitlabVerifyLog")$NL"
     if [ $ES_restore_gitlab -eq 0 ]; then
         MailSubject="GitLab on $GitServer restored"
         RestoreStatus="successfully"
@@ -196,45 +190,232 @@ email_success() {
         MailSubject="GitLab on $GitServer NOT restored"
         RestoreStatus="unsuccessfully"
         Level="CRIT"
-        # Create a string with the entire message but without printf controls and with \n replaced with '\n':
-        GitlabImportlogg="$(tr -d '\r' < "$GitlabImportLog" | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | awk '{printf "%s\\n", $0}')"
-        DetailStrJSON='{ "reporter":"'$ScriptFullName'", "filename": "'$BackupFile'", "num-bytes": '$FileSize', "gitlab_importlogg":"'$GitlabImportlogg'" }'
-        MailReport+="${NL}${NL}ERROR:${NL}"
-        MailReport+="$(cat $GitlabImportLog | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | grep -Ev " Deleting |^\s*$|Unpacking backup|Cleaning up|Transfering ownership")"
+    fi
+    if ${USE_HTML_EMAIL:-false}; then
+        echo '<body>' >> $EmailTempFile
+        echo '<div class="main_page">' >> $EmailTempFile
+        echo '  <div class="flexbox-container">' >> $EmailTempFile
+        echo '    <div id="box-header">' >> $EmailTempFile
+        echo '      <h3>Restore report for</h3>' >> $EmailTempFile
+        echo '      <h1>'$GitServer'</h1>' >> $EmailTempFile
+        echo '      <h4>'$now'</h4>' >> $EmailTempFile
+        echo '    </div>' >> $EmailTempFile
+        echo '  </div>' >> $EmailTempFile
+        echo '  <section>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p align="left">Report generated by script: <code>'$ScriptFullName'</code><br>' >> $EmailTempFile
+        echo '      Script launched '$ScriptLaunchText' by: <code>'${ScriptLauncher:---no launcher detected--}'</code> </p>' >> $EmailTempFile
+        echo '    <p align="left">&nbsp;</p>' >> $EmailTempFile
+        echo '    <table id="jobe">' >> $EmailTempFile
+        echo '      <thead>' >> $EmailTempFile
+        echo '        <tr><th align="right" colspan="2">Backup</th></tr>' >> $EmailTempFile
+        echo '      </thead>' >> $EmailTempFile
+        echo '      <tbody>' >> $EmailTempFile
+        echo '        <tr><td>Status:</td><td style="color: green;">'$RestoreStatus'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Running version:</td><td>'$RunningVersion'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Version in file:</td><td>'$GitlabVersionInFile'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Source:</td><td>'${RemoteHost}': <code>'$RemoteDataPath'</code> &uml; <code>'$RemoteConfPath'</code></td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Filename:</td><td>'$BackupFile'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Copy time:</td><td>'$CopyTime'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Backup ended:</td><td>'$BackupTime' (end)</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Restore started:</td><td>'$RestoreTimeStart' (start)"</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Restore duration:</td><td>'$TimeTaken'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>File size:</td><td>'$FileSizeGiB'</td></tr>' >> $EmailTempFile
+        if [ "$VerifyStatus" = "correct" ]; then
+            TextColor="green"
+        else
+            TextColor="red"
+        fi
+        echo '        <tr><td>Verify:</td><td style="color '$TextColor'">'$VerifyStatus'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td colspan="2">Details:</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>- import:</td><td><code>'$GitlabImportLog'</code></td></tr>' >> $EmailTempFile
+        echo '        <tr><td>- reconfigure:</td><td><code>'$GitlabReconfigureLog'</code></td></tr>' >> $EmailTempFile
+        echo '        <tr><td>- verify:</td><td><code>'$GitlabVerifyLog'</code></td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Space remaining:</td><td>'$SpaceAfterRestoreGiB' ('$SpaceAfterRestorePercent') remaining on <code>'$LocalBackupMP'</code> (<code>'$LocalBackupFS'</code>)</td></tr>' >> $EmailTempFile
+        echo '      </tbody>' >> $EmailTempFile
+        echo '    </table>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '  </section>' >> $EmailTempFile
+        echo '  <p align="center"><em>Department of Computer Science, LTH/LU</em></p>' >> $EmailTempFile
+        echo '</div>' >> $EmailTempFile
+        echo '</body>' >> $EmailTempFile
+        echo '</html>' >> $EmailTempFile
+    else
+        # Skapa rapport
+        MailReport+="Gitlab restored ${RestoreStatus}.${NL}"
+        MailReport+="$NL"
+        MailReport+="Details:$NL"
+        MailReport+="=================================================$NL"
+        MailReport+="$(printf "$FormatStr\n" "Running version:" "$RunningVersion")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Version in file:" "$GitlabVersionInFile")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Source:" "${RemoteHost}: $RemoteDataPath & $RemoteConfPath")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Filename:" "$BackupFile")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Backup ended:" "$BackupTime (end)")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Restore started:" "$RestoreTimeStart (start)")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Restore duration:" "${TimeTaken/0 hour /}")$NL"
+        MailReport+="$(printf "$FormatStr\n" "File size:" "$FileSizeGiB")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Space remaining:" "$SpaceAfterRestoreGiB remaining on $LocalBackupDir")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Verify:" "$VerifyStatus")$NL"
+        MailReport+="$(printf "$FormatStr\n" "Details:" " ")$NL"
+        MailReport+="$(printf "$FormatStr\n" "- import:" "$GitlabImportLog")$NL"
+        MailReport+="$(printf "$FormatStr\n" "- reconfigure:" "$GitlabReconfigureLog")$NL"
+        MailReport+="$(printf "$FormatStr\n" "- verify:" "$GitlabVerifyLog")$NL"
+        if [ $ES_restore_gitlab -ne 0 ]; then
+            # Create a string with the entire message but without printf controls and with \n replaced with '\n':
+            GitlabImportlogg="$(tr -d '\r' < "$GitlabImportLog" | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | awk '{printf "%s\\n", $0}')"
+            DetailStrJSON='{ "reporter":"'$ScriptFullName'", "filename": "'$BackupFile'", "num-bytes": '$FileSize', "gitlab_importlogg":"'$GitlabImportlogg'" }'
+            MailReport+="${NL}${NL}ERROR:${NL}"
+            MailReport+="$(cat $GitlabImportLog | sed "s,\x1B\[[0-9;]*[a-zA-Z],,g" | grep -Ev " Deleting |^\s*$|Unpacking backup|Cleaning up|Transfering ownership")"
+        fi
     fi
 }
 
 
 # Create email for when not enogh space is available on local disk
 email_not_enough_space() {
-    MailSubject="GitLab on $GitServer NOT restored"
-    MailReport+="Insufficient space to perform the restore$NL$NL"
-    MailReport+="Filename:        $BackupFile$NL"
-    MailReport+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
-    MailReport+="Available space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
+    if ${USE_HTML_EMAIL:-false}; then
+        echo '<body>' >> $EmailTempFile
+        echo '<div class="main_page">' >> $EmailTempFile
+        echo '  <div class="flexbox-container">' >> $EmailTempFile
+        echo '    <div id="box-header">' >> $EmailTempFile
+        echo '      <h3>Restore report for</h3>' >> $EmailTempFile
+        echo '      <h1>'$GitServer'</h1>' >> $EmailTempFile
+        echo '      <h4>'$now'</h4>' >> $EmailTempFile
+        echo '    </div>' >> $EmailTempFile
+        echo '  </div>' >> $EmailTempFile
+        echo '  <section>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p align="left">Report generated by script: <code>'$ScriptFullName'</code><br>' >> $EmailTempFile
+        echo '      Script launched '$ScriptLaunchText' by: <code>'${ScriptLauncher:---no launcher detected--}'</code> </p>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <h2 style="color: red">GitLab on '$GitServer' NOT restored</h2>' >> $EmailTempFile
+        echo '    <p align="left">&nbsp;</p>' >> $EmailTempFile
+        echo '    <table id="jobe">' >> $EmailTempFile
+        echo '      <thead>' >> $EmailTempFile
+        echo '        <tr><th align="right" colspan="2">Details</th></tr>' >> $EmailTempFile
+        echo '      </thead>' >> $EmailTempFile
+        echo '      <tbody>' >> $EmailTempFile
+        echo '        <tr><td>Reason:</td>Insufficient space to perform the restore</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Filename:</td><td>'$BackupFile'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>File size:</td><td>'$(printf "%'d" $((FileSize / 1048576)))' MiB</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Available space:</td><td>'$(printf "%'d" $((SpaceAvailable / 1048576)))' MiB</td></tr>' >> $EmailTempFile
+        echo '      </tbody>' >> $EmailTempFile
+        echo '    </table>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '  </section>' >> $EmailTempFile
+        echo '  <p align="center"><em>Department of Computer Science, LTH/LU</em></p>' >> $EmailTempFile
+        echo '</div>' >> $EmailTempFile
+        echo '</body>' >> $EmailTempFile
+        echo '</html>' >> $EmailTempFile
+    else
+        MailSubject="GitLab on $GitServer NOT restored"
+        MailReport+="Insufficient space to perform the restore$NL$NL"
+        MailReport+="Filename:        $BackupFile$NL"
+        MailReport+="Filesize:        $(printf "%'d" $((FileSize / 1048576))) MiB$NL"
+        MailReport+="Available space: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB"
+    fi
 }
 
 
 # Create email for when one or more files could not be fetched
 email_files_broken() {
     MailSubject="GitLab on $GitServer NOT restored "
-    if [ $ES_scp_database -ne 0 ]; then
-        MailReport+="Backup file could not be retrieved from ${RemoteHost}: $RemoteDataPath & $RemoteConfPath for server $GitServer.$NL"
-        MailReport+="No restore performed. Error: ${ES_scp_database}$NL$NL"
-    elif [ $ES_scp_config -ne 0 ]; then
-        MailReport+="Could NOT fetch some of the important config files:$NL"
-        MailReport+="$ErrortextScpConfig$NL$NL"
+    if ${USE_HTML_EMAIL:-false}; then
+        echo '<body>' >> $EmailTempFile
+        echo '<div class="main_page">' >> $EmailTempFile
+        echo '  <div class="flexbox-container">' >> $EmailTempFile
+        echo '    <div id="box-header">' >> $EmailTempFile
+        echo '      <h3>Restore report for</h3>' >> $EmailTempFile
+        echo '      <h1>'$GitServer'</h1>' >> $EmailTempFile
+        echo '      <h4>'$now'</h4>' >> $EmailTempFile
+        echo '    </div>' >> $EmailTempFile
+        echo '  </div>' >> $EmailTempFile
+        echo '  <section>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p align="left">Report generated by script: <code>'$ScriptFullName'</code><br>' >> $EmailTempFile
+        echo '      Script launched '$ScriptLaunchText' by: <code>'${ScriptLauncher:---no launcher detected--}'</code> </p>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <h2 style="color: red">GitLab on '$GitServer' NOT restored</h2>' >> $EmailTempFile
+        echo '    <p align="left">&nbsp;</p>' >> $EmailTempFile
+        echo '    <table id="jobe">' >> $EmailTempFile
+        echo '      <thead>' >> $EmailTempFile
+        echo '        <tr><th align="right" colspan="2">Details</th></tr>' >> $EmailTempFile
+        echo '      </thead>' >> $EmailTempFile
+        echo '      <tbody>' >> $EmailTempFile
+        if [ $ES_scp_database -ne 0 ]; then
+            echo '        <tr><td colspan="2">Insufficient space to perform the restore</td></tr>' >> $EmailTempFile
+            echo '        <tr><td colspan="2">No restore performed. Error: '${ES_scp_database}'</td></tr>' >> $EmailTempFile
+        else
+            echo '        <tr><td colspan="2">Could NOT fetch some of the important config files:</td></tr>' >> $EmailTempFile
+            echo '        <tr><td colspan="2">'$ErrortextScpConfig'</td></tr>' >> $EmailTempFile
+        fi
+        echo '      </tbody>' >> $EmailTempFile
+        echo '    </table>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '  </section>' >> $EmailTempFile
+        echo '  <p align="center"><em>Department of Computer Science, LTH/LU</em></p>' >> $EmailTempFile
+        echo '</div>' >> $EmailTempFile
+        echo '</body>' >> $EmailTempFile
+        echo '</html>' >> $EmailTempFile
+    else
+        if [ $ES_scp_database -ne 0 ]; then
+            MailReport+="Backup file could not be retrieved from ${RemoteHost}: $RemoteDataPath & $RemoteConfPath for server $GitServer.$NL"
+            MailReport+="No restore performed. Error: ${ES_scp_database}$NL$NL"
+        elif [ $ES_scp_config -ne 0 ]; then
+            MailReport+="Could NOT fetch some of the important config files:$NL"
+            MailReport+="$ErrortextScpConfig$NL$NL"
+        fi
     fi
 }
 
 
 email_db_file_not_found() {
     MailSubject="GitLab on $GitServer NOT restored (no file for today ($TodayDate) found on $RemoteHost)"
-    MailReport+="No file found on $RemoteHost (looking at $RemoteDataPath & $RemoteConfPath)$NL$NL"
-    MailReport+="Today date:  $TodayDate$NL"
-    MailReport+="Remote host: $RemoteHost$NL$NL"
-    MailReport+="Files on server:$NL"
-    MailReport+="$RemoteFiles"
+    if ${USE_HTML_EMAIL:-false}; then
+        echo '<body>' >> $EmailTempFile
+        echo '<div class="main_page">' >> $EmailTempFile
+        echo '  <div class="flexbox-container">' >> $EmailTempFile
+        echo '    <div id="box-header">' >> $EmailTempFile
+        echo '      <h3>Restore report for</h3>' >> $EmailTempFile
+        echo '      <h1>'$GitServer'</h1>' >> $EmailTempFile
+        echo '      <h4>'$now'</h4>' >> $EmailTempFile
+        echo '    </div>' >> $EmailTempFile
+        echo '  </div>' >> $EmailTempFile
+        echo '  <section>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p align="left">Report generated by script: <code>'$ScriptFullName'</code><br>' >> $EmailTempFile
+        echo '      Script launched '$ScriptLaunchText' by: <code>'${ScriptLauncher:---no launcher detected--}'</code> </p>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <h2 style="color: red">GitLab on '$GitServer' NOT restored</h2>' >> $EmailTempFile
+        echo '    <p align="left">&nbsp;</p>' >> $EmailTempFile
+        echo '    <table id="jobe">' >> $EmailTempFile
+        echo '      <thead>' >> $EmailTempFile
+        echo '        <tr><th align="right" colspan="2">Details</th></tr>' >> $EmailTempFile
+        echo '      </thead>' >> $EmailTempFile
+        echo '      <tbody>' >> $EmailTempFile
+        echo '        <tr><td colspan="2">No file found on '$RemoteHost' (looking at <code>'$RemoteDataPath'</code> & <code>'$RemoteConfPath'</code>)</td></tr>' >> $EmailTempFile
+        echo '        <tr><td colspan="2">Today date:  '$TodayDate'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td colspan="2">Files on server:</td></tr>' >> $EmailTempFile
+        echo '        <tr><td colspan="2"><code>'$(echo "$RemoteFiles" | awk '{print $6" "$7" "$8" "$9}' | sed ':a;N;$!ba;s/\n/<br>/g')'</code></td></tr>' >> $EmailTempFile
+        echo '      </tbody>' >> $EmailTempFile
+        echo '    </table>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '    <p>&nbsp;</p>' >> $EmailTempFile
+        echo '  </section>' >> $EmailTempFile
+        echo '  <p align="center"><em>Department of Computer Science, LTH/LU</em></p>' >> $EmailTempFile
+        echo '</div>' >> $EmailTempFile
+        echo '</body>' >> $EmailTempFile
+        echo '</html>' >> $EmailTempFile
+    else
+        MailReport+="No file found on $RemoteHost (looking at $RemoteDataPath & $RemoteConfPath)$NL$NL"
+        MailReport+="Today date:  $TodayDate$NL"
+        MailReport+="Remote host: $RemoteHost$NL$NL"
+        MailReport+="Files on server:$NL"
+        MailReport+="$RemoteFiles"
+    fi
 }
 
 
@@ -287,15 +468,21 @@ restore_gitlab() {
 
     End=$(date +%s)
     Secs=$((End - Start))
-    TimeTaken="$((Secs/3600)) hour $((Secs%3600/60)) min $((Secs%60)) sec"
-    SpaceAvailableAfterRestoreGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"      # Ex: SpaceAvailableAfterRestoreGiB='261 GiB'
+    TimeTakenRaw="$((Secs/3600)) hour $((Secs%3600/60)) min $((Secs%60)) sec"
+    TimeTaken="$(echo "$TimeTakenRaw" | sed 's/0 hour //;s/^0 min //')"
+    SpaceAfterRestoreGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"                                 # Ex: SpaceAfterRestoreGiB='261 GiB'
+    SpaceAfterRestorePercent="$(echo "scale=0; 100 - $(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $5}' | tr -d '%')" | bc -l)%"  # Ex: SpaceAfterRestorePercent=74%
 }
 
 
 # Copy the database backup
 copy_database() {
+    local CopyStart=$(date +%s)
     scp $RemoteUser@$RemoteHost:"$RemoteFileName" . &>/dev/null
     ES_scp_database=$?
+    CopyTimeSecs=$(( $(date +%s) - CopyStart ))
+    CopyTimeRaw="$((CopyTimeSecs/3600)) hour $((CopyTimeSecs%3600/60)) min $((CopyTimeSecs%60)) sec"
+    CopyTime="$(echo "$CopyTimeRaw" | sed 's/0 hour //;s/^0 min //')"
     chown 998:998 "$BackupFile" 2>/dev/null
 }
 
@@ -318,9 +505,13 @@ copy_config() {
 
 # Send the composed email if Recipient has a value
 send_email() {
-    MailReport+="${NL}${NL}End time: $(date +%F" "%H:%M" "%Z)"
-    if [ -n "$Recipient" ]; then
-        echo "$MailReport" | mail -s "$MailSubject" "$Recipient"
+    if ${USE_HTML_EMAIL:-false}; then
+        cat $EmailTempFile | sed "s/Subject: STATUS/Subject: $MailSubject/" | /sbin/sendmail -t
+    else
+        MailReport+="${NL}${NL}End time: $(date +%F" "%H:%M" "%Z)"
+        if [ -n "$Recipient" ]; then
+            echo "$MailReport" | mail -s "$MailSubject" "$Recipient"
+        fi
     fi
 }
 
@@ -353,8 +544,17 @@ trigger_maintenance "60m"
 cd $LocalBackupDir || exit 1
 
 # Prepare the mailbody with a header:
-MailReport="Report from $GitServer at $(date -d @$RestoreTimeStart +%F" "%H:%M" "%Z)$NL"
-MailReport+="(script: ${ScriptFullName}, launched by: ${ScriptLauncher:---no launcher detected--})$NL$NL"
+if ${USE_HTML_EMAIL:-false}; then
+    EmailTempFile=$(mktemp)
+    echo "To: $Recipient" >> $EmailTempFile
+    echo "Subject: STATUS" >> $EmailTempFile
+    echo "Content-Type: text/html" >> $EmailTempFile
+    echo "" >> $EmailTempFile
+    curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;s/22458a/b4d7b8/g;s/Backup report/Restore report/;s/ color: white/ color: black/g" >> $EmailTempFile
+else
+    MailReport="Report from $GitServer at $(date -d @$RestoreTimeStart +%F" "%H:%M" "%Z)$NL"
+    MailReport+="(script: ${ScriptFullName}, launched by: ${ScriptLauncher:---no launcher detected--})$NL$NL"
+fi
 
 # Continue if a file is found on the remote server
 if [ -n "$RemoteFile" ]; then
