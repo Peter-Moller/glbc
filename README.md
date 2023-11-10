@@ -99,3 +99,6 @@ Details:
 - reconfigure:     /var/tmp/gitlab_reconfigurelogg_2023-09-07.txt
 - verify:          /var/tmp/gitlab_verifylogg_2023-09-07.txt
 ```
+
+![example of restore email](example_restore.png)
+
