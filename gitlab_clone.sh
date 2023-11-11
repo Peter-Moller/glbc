@@ -184,12 +184,12 @@ get_remote_file_data() {
 email_success() {
     if [ $ES_restore_gitlab -eq 0 ]; then
         MailSubject="GitLab on $GitServer restored"
-        RestoreStatus="successfully"
+        RestoreStatus="successful"
         Level="GOOD"
         TextColor="green"
     else
         MailSubject="GitLab on $GitServer NOT restored"
-        RestoreStatus="unsuccessfully"
+        RestoreStatus="unsuccessful"
         Level="CRIT"
         TextColor="red"
     fi
@@ -216,14 +216,15 @@ email_success() {
         echo '        <tr><td>Status:</td><td style="color: '$TextColor';">'$RestoreStatus'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Running version:</td><td>'$RunningVersion'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Version in file:</td><td>'$GitlabVersionInFile'</td></tr>' >> $EmailTempFile
-        echo '        <tr><td>Source:</td><td>'${RemoteHost}': <code>'$RemoteDataPath'</code> &amp; <code>'$RemoteConfPath'</code></td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Source host:</td><td>'${RemoteHost}'</td></tr>' >> $EmailTempFile
+        echo '        <tr><td>Source directories:</td><td><code>'$RemoteDataPath'</code> &amp;<br><code>'$RemoteConfPath'</code></td></tr>' >> $EmailTempFile
         echo '        <tr><td>Filename:</td><td><code>'$BackupFile'</code></td></tr>' >> $EmailTempFile
         echo '        <tr><td>Copy time:</td><td>'$CopyTime'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Backup ended:</td><td>'$BackupTime' (end)</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Restore started:</td><td>'$RestoreTimeStart' (start)</td></tr>' >> $EmailTempFile
         echo '        <tr><td>Restore duration:</td><td>'$TimeTaken'</td></tr>' >> $EmailTempFile
         echo '        <tr><td>File size:</td><td>'$FileSizeGiB'</td></tr>' >> $EmailTempFile
-        if [ "$VerifyStatus" = "correct" ]; then
+        if [ "$VerifyStatus" = "successful" ]; then
             TextColor="green"
         else
             TextColor="red"
@@ -245,7 +246,7 @@ email_success() {
         echo '</html>' >> $EmailTempFile
     else
         # Skapa rapport
-        MailReport+="Gitlab restored ${RestoreStatus}.${NL}"
+        MailReport+="Gitlab restore: ${RestoreStatus}.${NL}"
         MailReport+="$NL"
         MailReport+="Details:$NL"
         MailReport+="=================================================$NL"
@@ -441,10 +442,10 @@ restore_gitlab() {
     docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes' &>"$GitlabImportLog"
     ES_restore_gitlab=$?
     if [ $ES_restore_gitlab -eq 0 ]; then
-        RestoreStatus="successfully"
+        RestoreStatus="successful"
         Level="GOOD"
     else
-        RestoreStatus="unsuccessfully"
+        RestoreStatus="unsuccessful"
         Level="CRIT"
     fi
 
@@ -461,9 +462,9 @@ restore_gitlab() {
     docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true &>"$GitlabVerifyLog"
     ES_sanitycheck=$?
     if [ $ES_sanitycheck -eq 0 ]; then
-        VerifyStatus="correct"
+        VerifyStatus="successful"
     else
-        VerifyStatus="incorrect"
+        VerifyStatus="unsuccessful"
         # Make sure the Level is CRIT even if it was GOOD from the restore
         Level="CRIT"
     fi
