@@ -16,7 +16,7 @@
 #
 # First created 2022-05-13
 # Peter Möller, Department of Computer Science, Lund University
-
+set -x
 # General settings
 Start=$(date +%s)
 now="$(date "+%Y-%m-%d %T %Z")"
@@ -484,7 +484,7 @@ copy_config() {
 # Send the composed email if Recipient has a value
 send_email() {
     if ${USE_HTML_EMAIL:-false}; then
-        cat "$EmailTempFile | sed "s/Subject: STATUS/Subject: $MailSubject/" | /sbin/sendmail -t"
+        cat "$EmailTempFile" | sed "s/Subject: STATUS/Subject: $MailSubject/" | /sbin/sendmail -t
     else
         MailReport+="${NL}${NL}End time: $(date +%F" "%H:%M" "%Z)"
         if [ -n "$Recipient" ]; then
