@@ -16,7 +16,7 @@
 #
 # First created 2022-05-13
 # Peter Möller, Department of Computer Science, Lund University
-set -x
+
 # General settings
 Start=$(date +%s)
 now="$(date "+%Y-%m-%d %T %Z")"
