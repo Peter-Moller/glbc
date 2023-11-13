@@ -32,6 +32,7 @@ GitlabReadinessURL="https://localhost/-/readiness"
 RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\r' | tr -d '\n')"     # Ex: RunningVersion='gitlab-ce 16.3.0'
 NL=$'\n'
 FormatStr="%-19s%-50s"
+CSS_colorfix="s/jobe_th_bgc/${jobe_th_bgc:-22458a}/g;s/jobe_th_c/${jobe_th_c:-white}/g;s/box_h_bgc/${box_h_bgc:-22458a}/g;s/box_h_c/${box_h_c:-white}/g"
 
 # Read nessesary settings file. Exit if it’s not found
 if [ -r ~/.gitlab_backup.settings ]; then
@@ -188,7 +189,7 @@ prepare_email() {
         echo "Subject: STATUS" >> "$EmailTempFile"
         echo "Content-Type: text/html" >> "$EmailTempFile"
         echo "" >> "$EmailTempFile"
-        curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;s/Backup report/Restore report/;s/jobe_th_bgc/$jobe_th_bgc/g;s/jobe_th_c/$jobe_th_c/g;s/box_h_bgc/$box_h_bgc/g;s/box_h_c/$box_h_c/g" >> "$EmailTempFile"
+        curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;s/Backup report/Restore report/;$CSS_colorfix" >> "$EmailTempFile"
         echo '<body>' >> "$EmailTempFile"
         echo '<div class="main_page">' >> "$EmailTempFile"
         echo '  <div class="flexbox-container">' >> "$EmailTempFile"
