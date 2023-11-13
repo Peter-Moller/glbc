@@ -25,8 +25,8 @@ NL=$'\n'
 export LC_ALL=en_US.UTF-8
 RsyncArgs="--verbose --archive --delete --perms --group --times -e ssh"
 BackupMethod="gitlab gitlab-backup create"
-ReportHead=https://fileadmin.cs.lth.se/intern/backup/custom_report_head.html
 now="$(date "+%Y-%m-%d %T %Z")"
+CSS_colorfix="s/jobe_th_bgc/${jobe_th_bgc:-22458a}/g;s/jobe_th_c/${jobe_th_c:-white}/g;s/box_h_bgc/${box_h_bgc:-22458a}/g;s/box_h_c/${box_h_c:-white}/g"
 
 # Make sure AutoReboot will not reboot the machine:
 echo "gitlab backup" > $StopRebootFile
@@ -274,7 +274,7 @@ email_html_create() {
     echo "" >> $EmailTempFile
 
     # Get the head of the custom report, replace SERVER and DATE
-    curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;s/jobe_th_bgc/$jobe_th_bgc/g;s/jobe_th_c/$jobe_th_c/g;s/box_h_bgc/$box_h_bgc/g;s/box_h_c/$box_h_c/g" >> $EmailTempFile
+    curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;$CSS_colorfix" >> $EmailTempFile
     # Only continue if it worked
     if grep "Backup report for" $EmailTempFile 2>/dev/null ; then
         echo "<body>" >> $EmailTempFile
