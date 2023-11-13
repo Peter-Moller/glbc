@@ -38,12 +38,17 @@ Recipient=user@system.dns.name
 DeleteFilesNumDays=2
 ReportHead=https://fileadmin.cs.lth.se/intern/backup/custom_report_head.html
 USE_HTML_EMAIL=true
+jobe_th_bgc=22458a
+jobe_th_c=white
+box_h_bgc=22458a
+box_h_c=white
 ```
 
 A note on the `ReportHead`:  
 
   * it should contain the first part of the complete html page, from `<!DOCTYPE html...` to `</head>`
   * the rest will be completed by the script itself (i.e. from `<body>` to `</html>`)
+  * the last four sets the color for the CSS-style in `$ReportHead`. If not specified, they will default to the values show above
 
 
 
