@@ -188,7 +188,7 @@ prepare_email() {
         echo "Subject: STATUS" >> "$EmailTempFile"
         echo "Content-Type: text/html" >> "$EmailTempFile"
         echo "" >> "$EmailTempFile"
-        curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;s/22458a/b4d7b8/g;s/Backup report/Restore report/;s/ color: white/ color: black/g" >> "$EmailTempFile"
+        curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;s/Backup report/Restore report/;s/jobe_th_bgc/$jobe_th_bgc/g;s/jobe_th_c/$jobe_th_c/g;s/box_h_bgc/$box_h_bgc/g;s/box_h_c/$box_h_c/g" >> "$EmailTempFile"
         echo '<body>' >> "$EmailTempFile"
         echo '<div class="main_page">' >> "$EmailTempFile"
         echo '  <div class="flexbox-container">' >> "$EmailTempFile"
