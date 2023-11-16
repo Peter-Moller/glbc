@@ -64,11 +64,12 @@ script_launcher() {
     if [ -z "$ScriptLauncher" ]; then
         ScriptLauncher="$(grep "$ScriptName" /var/spool/cron/crontabs/* | grep -Ev "#" | cut -d: -f1 | sed ':a;N;$!ba;s/\n/ \& /g')"
     fi
+    ScriptLaunchByUser="<code>$(grep "$ScriptName" "$ScriptLauncher" | grep -Ev "#" | awk '{print $6}')</code>"                    # Ex: ScriptLaunchByUser='<code>root</code>'
     ScriptLaunchWhenStr="$(grep "$ScriptName" "$ScriptLauncher" | grep -Ev "#" | awk '{print $1" "$2" "$3" "$4" "$5}')"            # Ex: ScriptLaunchWhenStr='55 3 * * *'
     ScriptLaunchDay="$(echo "$ScriptLaunchWhenStr" | awk '{print $5}' | sed 's/*/day/; s/0/Sunday/; s/1/Monday/; s/2/Tuesday/; s/3/Wednesday/; s/4/Thursday/; s/5/Friday/; s/6/Saturday/')"
     ScriptLaunchHour="$(echo "$ScriptLaunchWhenStr" | awk '{print $2}')"                                                           # Ex: ScriptLaunchHour=3
     ScriptLaunchMinute="$(echo "$ScriptLaunchWhenStr" | awk '{print $1}')"                                                         # Ex: ScriptLaunchMinute=55
-    ScriptLaunchText="every $ScriptLaunchDay at $(printf "%02d:%02d" "${ScriptLaunchHour#0}" "${ScriptLaunchMinute#0}")"           # Ex: ScriptLaunchText='day at 03:55'
+    ScriptLaunchText="as $ScriptLaunchByUser every $ScriptLaunchDay at $(printf "%02d:%02d" "${ScriptLaunchHour#0}" "${ScriptLaunchMinute#0}")"           # Ex: ScriptLaunchText='as <code>root</code> every day at 03:55'
 }
 
 
