@@ -284,7 +284,7 @@ email_html_create() {
         echo '    <div id="box-header">' >> $EmailTempFile
         echo "      <h3>Backup report for</h3>" >> $EmailTempFile
         echo "      <h1>$GitServer</h1>" >> $EmailTempFile
-        echo "      <h4>$now</h4>" >> $EmailTempFile
+        echo "      <h4>$(date "+%Y-%m-%d %T %Z")</h4>" >> $EmailTempFile
         echo "    </div>" >> $EmailTempFile
         echo "  </div>" >> $EmailTempFile
         echo "  <section>" >> $EmailTempFile
