@@ -17,6 +17,14 @@
 # First created 2022-05-13
 # Peter Möller, Department of Computer Science, Lund University
 
+# Read nessesary settings file. Exit if it’s not found
+if [ -r ~/.gitlab_backup.settings ]; then
+    source ~/.gitlab_backup.settings
+else
+    echo "Settings file not found. Will exit!"
+    exit 1
+fi
+
 # General settings
 Start=$(date +%s)
 now="$(date "+%Y-%m-%d %T %Z")"
@@ -34,18 +42,24 @@ NL=$'\n'
 FormatStr="%-19s%-50s"
 CSS_colorfix="s/jobe_th_bgc/${jobe_th_bgc:-22458a}/g;s/jobe_th_c/${jobe_th_c:-white}/g;s/box_h_bgc/${box_h_bgc:-22458a}/g;s/box_h_c/${box_h_c:-white}/g"
 
-# Read nessesary settings file. Exit if it’s not found
-if [ -r ~/.gitlab_backup.settings ]; then
-    source ~/.gitlab_backup.settings
-else
-    echo "Settings file not found. Will exit!"
-    exit 1
-fi
 LocalBackupMP="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $NF}')"                                        # Ex: LocalBackupMP=/opt
 LocalBackupFS="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $1}')"                                         # Ex: LocalBackupFS=/dev/mapper/vg1-opt
 
 # Get the amount of storage available locally:
 SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                                         # Ex: SpaceAvailable='301852954624'
+RestoreMethod="copy <code>gitlab-secrets.json</code> &#8594; $LocalConfDir<br>"
+RestoreMethod+="copy <code>ssh_*</code> &#8594; $LocalConfDir<br>"
+RestoreMethod+="copy <code>docker-compose.yaml</code> &#8594; $LocalConfDir<br>"
+RestoreMethod+="<code>docker compose up --force-recreate -d</code><br>"
+RestoreMethod+="Wait...<br>"
+RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop puma</code><br>"
+RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop sidekiq</code><br>"
+RestoreMethod+="<code>docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes'</code><br>"
+RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl reconfigure</code><br>"
+RestoreMethod+="<code>docker restart gitlab</code><br>"
+RestoreMethod+="Wait...<br>"
+RestoreMethod+="<code>docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true</code>"
+
 
 
 
@@ -215,6 +229,7 @@ prepare_email() {
 # Create email for successful restore:
 email_success() {
     echo '        <tr><td>Status:</td><td style="color: '$RestoreStatusTC';">'$RestoreStatus'</td></tr>' >> "$EmailTempFile"
+    echo '        <tr><td>Restore method:</td><td>'$RestoreMethod'</td></tr>' >> "$EmailTempFile"
     echo '        <tr><td>Running version:</td><td>'$RunningVersion'</td></tr>' >> "$EmailTempFile"
     echo '        <tr><td>Version in file:</td><td>'$GitlabVersionInFile'</td></tr>' >> "$EmailTempFile"
     echo '        <tr><td>Source host:</td><td>'${RemoteHost}'</td></tr>' >> "$EmailTempFile"
