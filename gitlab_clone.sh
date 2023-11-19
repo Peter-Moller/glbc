@@ -318,12 +318,12 @@ restore_gitlab() {
     if [ $ES_restore_gitlab -eq 0 ]; then
         RestoreStatus="successful"
         Level="GOOD"
-        MailSubject="GitLab on $GitServer restored"
+        MailSubject="Restore successful"
         RestoreStatusTC="green"
     else
         RestoreStatus="unsuccessful"
         Level="CRIT"
-        MailSubject="GitLab on $GitServer NOT restored"
+        MailSubject="Restore unsuccessful"
         RestoreStatus="unsuccessful"
         RestoreStatusTC="red"
     fi
