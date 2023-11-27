@@ -336,6 +336,7 @@ email_html_create() {
             done <<< "$RsyncErrList"
             echo "        </table></td></tr>" >> $EmailTempFile
         fi
+        echo "        <tr><td>rsync arguments:</td><td><code>$RsyncArgs</code></td></tr>" >> $EmailTempFile
         echo "        <tr><td>Remote server:</td><td>$RemoteHost</td></tr>" >> $EmailTempFile
         echo "        <tr><td>Backup directory:</td><td><code>$LocalBackupDir</code>  &#8594;  <code>$RemoteDataPath</code></td></tr>" >> $EmailTempFile
         echo "        <tr><td>Config directory:</td><td><code>$LocalConfDir/</code> &#8594; <code>$RemoteConfPath</code></td></tr>" >> $EmailTempFile
