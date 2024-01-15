@@ -4,9 +4,9 @@ GitLab Backup and Clone
 **GLBC** is a set of two `bash`-scripts doing the very common function of:
 
   1. Creating a backup of a GitLab server (`gitlab_backup.sh`)
-  2. Restore that backup to another server, such as a testserveri (`gitlab_clone.sh`)
+  2. Restore that backup to another server, such as a testserver (`gitlab_clone.sh`)
 
-The backup file is stored on a [separate] file server.
+The backup file is stored on a separate file server (`RemoteHost`).
 
 -----
 
@@ -14,6 +14,7 @@ The backup file is stored on a [separate] file server.
 
   * A docker based GitLab system, running on a Linux system
   * A `/opt/gitlab/docker-compose.yaml` file
+  * A remote server to store the backups and important files _(`gitlab-secrets.json`, `docker-compose.yaml` and `ssh_*`)_
   * Working `scp` and `rsync` and access between the machines involved
 
 -----
@@ -38,18 +39,12 @@ Recipient=user@system.dns.name
 DeleteFilesNumDays=2
 ReportHead=https://fileadmin.cs.lth.se/intern/backup/custom_report_head.html
 USE_HTML_EMAIL=true
-jobe_th_bgc=22458a
-jobe_th_c=white
-box_h_bgc=22458a
-box_h_c=white
 ```
 
 A note on the `ReportHead`:  
 
   * it should contain the first part of the complete html page, from `<!DOCTYPE html...` to `</head>`
   * the rest will be completed by the script itself (i.e. from `<body>` to `</html>`)
-  * the last four sets the color for the CSS-style in `$ReportHead`. If not specified, they will default to the values show above
-
 
 
 ## Output
@@ -57,6 +52,8 @@ A note on the `ReportHead`:
 The scripts will send reports to a email (if given in the settings file) after processing is done.
 
 ### gitlab_backup.sh
+
+Unless `USE_HTML_EMAIL`is `true`, a text-only report will be generated:
 ```text
 Backup report from git.dns.name (script: "/home/username/glbc/gitlab_backup.sh") at 2023-09-07 04:56 CEST
 
@@ -77,11 +74,12 @@ Number of files:  1
 Bytes trasferred: 49,434 MiB
 Time taken:       19 min 37 sec
 ```
-
+Otherwise, a more comple HTML-report is generated:  
 ![example of backup email](example_backup.png)
 
-
 ### gitlab_clone.sh
+
+Similarly, a text-only report is given for the cloning unless `USE_HTML_EMAIL`is `true`:
 ```text
 Restore report from git-test.dns.name (script: "/home/username/glbc/gitlab_clone.sh")  at 2023-09-07 07:10 CEST
 
@@ -104,6 +102,5 @@ Details:
 - reconfigure:     /var/tmp/gitlab_reconfigurelogg_2023-09-07.txt
 - verify:          /var/tmp/gitlab_verifylogg_2023-09-07.txt
 ```
-
+Here also, the HTML-report is more complete:  
 ![example of restore email](example_restore.png)
-
