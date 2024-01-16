@@ -19,6 +19,22 @@ The backup file is stored on a separate file server (`RemoteHost`).
 
 -----
 
+### Functional core
+
+The core of the backup script is:  
+`gitlab-backup create`
+
+The core of the restore script is:  
+`gitlab-backup restore BACKUP=BackupFile.tar force=yes`
+
+Additionally, the following files are copied to the storage server and restored to the test-server:
+
+  * `gitlab-secrets.json`
+  * `docker-compose.yaml`
+  * The `ssh_*` files (certificates)
+
+-----
+
 ### Settings file
 
 In order to work, a settings file is required.
