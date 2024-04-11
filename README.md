@@ -50,6 +50,7 @@ RemoteDataPath="/some/directory/data"
 RemoteConfPath="/some/directory/config"
 RemoteHostKind=darwin
 BackupSignalFile=/opt/gitlab/embedded/service/gitlab-rails/tmp/backup_restore.pid
+BackupOptions='SKIP=builds,artifacts,registry STRATEGY=copy'
 StopRebootFile=/tmp/dont_reboot
 Recipient=user@system.dns.name
 DeleteFilesNumDays=2

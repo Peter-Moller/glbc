@@ -24,7 +24,7 @@ fi
 NL=$'\n'
 export LC_ALL=en_US.UTF-8
 RsyncArgs="--verbose --archive --delete --perms --group --times -e ssh"
-BackupMethod="gitlab gitlab-backup create"
+BackupMethod="gitlab gitlab-backup create $BackupOptions"
 now="$(date "+%Y-%m-%d %T %Z")"
 CSS_colorfix="s/jobe_th_bgc/${jobe_th_bgc:-22458a}/g;s/jobe_th_c/${jobe_th_c:-white}/g;s/box_h_bgc/${box_h_bgc:-22458a}/g;s/box_h_c/${box_h_c:-white}/g"
 
@@ -139,7 +139,7 @@ gitlab_backup() {
     StartTimeBackup=$(date +%s)
     BackupOutputFile=$(mktemp)
     # Do the actual backup:
-    /usr/bin/docker exec -t gitlab gitlab-backup create &>"$BackupOutputFile"
+    /usr/bin/docker exec -t gitlab gitlab-backup create $BackupOptions &>"$BackupOutputFile"
     ESbackup=$?
     EndTimeBackup=$(date +%s)
     TimeBackupSec=$((EndTimeBackup - StartTimeBackup))
