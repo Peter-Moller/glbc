@@ -264,9 +264,9 @@ email_html_create() {
     EmailTempFile=$(mktemp)
     # Get the status of the whole operation
     if [ $ESbackup -eq 0 ] && [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ]; then
-        Status='backup & rsync both successful'
+        Status='Successful backup & rsync'
     else
-        Status="backup: ${BackupStatusDB}; rsync: ${RsyncStatus}"
+        Status="Problem! Backup: ${BackupStatusDB}; rsync: ${RsyncStatus}"
     fi
     # Set the headers in order to use sendmail
     echo "To: $Recipient" >> $EmailTempFile
