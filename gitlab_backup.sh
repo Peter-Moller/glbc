@@ -118,7 +118,7 @@ check_space() {
     SpaceAvailable=$(df -kB1 "$LocalBackupDir" | grep -Ev "^Fil" | awk '{print $4}')                                   # Ex: SpaceAvailable=51703066624
     if [ $(echo "$SizeLastBackup * 2.3" | bc -l | cut -d\. -f1) -gt $SpaceAvailable ]; then
         DetailsJSON='{ "reporter":"'$ScriptFullName'", "space-available":"'$SpaceAvailable'", "num-bytes-last-backup": '${SizeLastBackup:-0}' }'
-        notify "/app/gitlab/backup" "Backup of gitlab cannot be done: not enough space available" "CRIT" "$DetailsJSON"
+        notify "app.gitlab.backup" "Backup of gitlab cannot be done: not enough space available" "CRIT" "$DetailsJSON"
         if [ -n "$Recipient" ]; then
             # Send email:
             echo "Backup of $GitServer cannot be done: not enough space available${NL}Space-available: $(printf "%'d" $((SpaceAvailable / 1048576))) MiB${NL}Last backup:     $(printf "%'d" $((SizeLastBackup / 1048576))) MiB" | mail -s "$GitServer cannot be backed up (not enough space)" $Recipient
@@ -132,7 +132,7 @@ check_space() {
 gitlab_backup() {
     # First: see if the previous backup concluded OK. Remove $BackupSignalFile if not
     if docker exec -it gitlab ls $BackupSignalFile &>/dev/null; then
-        notify "/app/gitlab/backup" "Previous backup of gitlab did not conclude. Removing signal file ($BackupSignalFile)" "INFO"
+        notify "app.gitlab.backup" "Previous backup of gitlab did not conclude. Removing signal file ($BackupSignalFile)" "INFO"
         docker exec -it gitlab rm $BackupSignalFile
     fi
 
@@ -168,10 +168,10 @@ gitlab_backup() {
     DetailsJSONBackup='{ "reporter": "'$ScriptFullName'", "file-name": "'$BackupName'", "num-bytes": '${BackupFileSizeB:-0}' }'
 
     if [ $ESbackup -eq 0 ]; then
-        notify "/app/gitlab/backup" "Backup of gitlab performed successfully in ${TimeTakenBackup/0 hour /}" "GOOD" "$DetailsJSONBackup"
+        notify "app.gitlab.backup" "Backup of gitlab performed successfully in ${TimeTakenBackup/0 hour /}" "GOOD" "$DetailsJSONBackup"
         BackupResult="successful"
     else
-        notify "/app/gitlab/backup" "Backup of gitlab on $GitServer FAILED (time: ${TimeTakenBackup/0 hour /})" "CRIT" "$DetailsJSONBackup"
+        notify "app.gitlab.backup" "Backup of gitlab on $GitServer FAILED (time: ${TimeTakenBackup/0 hour /})" "CRIT" "$DetailsJSONBackup"
         BackupResult="unsuccessful"
     fi
 }
@@ -214,10 +214,10 @@ rsync_backup() {
 
     # Notify the CS Monitoring System
     if [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ] && [ $ESScp -eq 0 ]; then
-        notify "/app/rsync/backup" "Rsync of git-backup and config to $RemoteHost in ${TimeTakenRsync/0 hour /}" "GOOD" "$DetailsJSONRsync"
+        notify "app.rsync.backup" "Rsync of git-backup and config to $RemoteHost in ${TimeTakenRsync/0 hour /}" "GOOD" "$DetailsJSONRsync"
         StatusRsync="successful"
     else
-        notify "/app/rsync/backup" "Rsync of git-backup to $RemoteHost FAILED (time: ${TimeTakenRsync/0 hour /})" "CRIT" "$DetailsJSONRsync"
+        notify "app.rsync.backup" "Rsync of git-backup to $RemoteHost FAILED (time: ${TimeTakenRsync/0 hour /})" "CRIT" "$DetailsJSONRsync"
         StatusRsync="unsuccessful"
     fi
 }

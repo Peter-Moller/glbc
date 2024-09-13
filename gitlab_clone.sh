@@ -445,7 +445,7 @@ if [ -n "$RemoteFile" ]; then
             email_success
 
             # Send notification to the CS Monitoring System ('DetailStrJSON' is constructed in 'restore_gitlab')
-            notify "/app/gitlab/restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
+            notify "app.gitlab.restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
 
             # Delete the temporary backupfile
             rm -f "$BackupFile"
@@ -453,7 +453,7 @@ if [ -n "$RemoteFile" ]; then
             # It did not go well:
             # we could not get either the database file or the config files
             # Send notification to the CS Monitoring System ('DetailStrJSON' is constructed in 'restore_gitlab')
-            notify "/app/gitlab/restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp_database" "CRIT" "$DetailStrJSON"
+            notify "app.gitlab.restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp_database" "CRIT" "$DetailStrJSON"
 
             email_files_broken
 
@@ -465,7 +465,7 @@ if [ -n "$RemoteFile" ]; then
         email_not_enough_space
 
         DetailStrJSON='{ "filename": "'$BackupFile'", "filesize": "'$((FileSize / 1048576))' MiB", "available_local_space": "'$((SpaceAvailable / 1048576))' MiB" }'
-        notify "/app/gitlab/restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
+        notify "app.gitlab.restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
     fi
 else
     # File not found on $RemoteHost
@@ -473,7 +473,7 @@ else
     email_db_file_not_found
 
     DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
-    notify "/app/gitlab/restored" "No file for today ($TodayDate) found on $RemoteHost" "CRIT" "$DetailStrJSON"
+    notify "app.gitlab.restored" "No file for today ($TodayDate) found on $RemoteHost" "CRIT" "$DetailStrJSON"
 fi
 
 send_email
