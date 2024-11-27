@@ -22,6 +22,7 @@ else
 fi
 
 NL=$'\n'
+TitleString="Backup report for “$GitServer” on $(date +%F)"
 export LC_ALL=en_US.UTF-8
 RsyncArgs="--verbose --archive --delete --perms --group --times -e ssh"
 BackupMethod="gitlab gitlab-backup create $BackupOptions"
@@ -275,7 +276,7 @@ email_html_create() {
     echo "" >> $EmailTempFile
 
     # Get the head of the custom report, replace SERVER and DATE
-    curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;$CSS_colorfix" >> $EmailTempFile
+    curl --silent $ReportHead | sed "s/TITLE/$TitleString/;$CSS_colorfix" >> $EmailTempFile
     # Only continue if it worked
     if grep "Backup report for" $EmailTempFile 2>/dev/null ; then
         echo "<body>" >> $EmailTempFile
@@ -375,6 +376,39 @@ email_html_send() {
     fi
 }
 
+monitor_md_report() {
+
+    DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    source "$DIR/html_to_md_report.sh"
+
+    MONITOR_RESTAPI_URL=https://monitor.cs.lth.se/v1
+    AUTH_TOKEN="C9gr/dI9E6VGvIIehXOo0UtuY7v60q9Pvq1LUZ3mwEFOUlH/"
+
+    HTMLTables=()
+    get_html_tables "$1"
+
+    Host="git.cs.lth.se"
+    
+    # Backup
+    Name="app.gitlab.backup.report"
+    RowsToInclude=()
+    ColumnHeader="Backup"
+    Markdown="$(create_md_report "$ColumnHeader" "${HTMLTables[0]}" "${RowsToInclude[@]}")"
+    Summary=$(echo "$Markdown" | sed -n 's/.*\(Time taken.*\)|.*/\1/p' | tr -d '|' | awk '{$1=$1};1')
+
+    OBSERVATION="$(python3 -c "import json; import sys; print(json.dumps({'host': sys.argv[1], 'name': sys.argv[2], 'object': {'\$schema': 'urn:report:markdown', 'summary': sys.argv[3], 'markdown': sys.argv[4]}}))" "$Host" "$Name" "$Summary" "$Markdown")"
+    echo "[$OBSERVATION]" | curl -X POST "$MONITOR_RESTAPI_URL/probe/observation/" -H  "X-Auth-Token: $AUTH_TOKEN" -H  "Accept: application/json" -H  "Content-Type: application/json" --data @-
+
+    # Rsync
+    Name="app.gitlab.rsync.report"
+    RowsToInclude=()
+    ColumnHeader="Rsync"
+    Markdown="$(create_md_report "$ColumnHeader" "${HTMLTables[1]}" "${RowsToInclude[@]}")"
+    Summary=$(echo "$Markdown" | sed -n 's/.*\(Time taken.*\)|.*/\1/p' | tr -d '|' | awk '{$1=$1};1')
+
+    OBSERVATION="$(python3 -c "import json; import sys; print(json.dumps({'host': sys.argv[1], 'name': sys.argv[2], 'object': {'\$schema': 'urn:report:markdown', 'summary': sys.argv[3], 'markdown': sys.argv[4]}}))" "$Host" "$Name" "$Summary" "$Markdown")"
+    echo "[$OBSERVATION]" | curl -X POST "$MONITOR_RESTAPI_URL/probe/observation/" -H  "X-Auth-Token: $AUTH_TOKEN" -H  "Accept: application/json" -H  "Content-Type: application/json" --data @-
+}
 
 #
 #   _____ _   _______    ___________   ______ _   _ _   _ _____ _____ _____ _____ _   _  _____
@@ -418,3 +452,5 @@ rm $StopRebootFile
 
 # Remove the backup file:
 rm $BackupOutputFile
+
+monitor_md_report "$(cat $EmailTempFile)"

@@ -29,6 +29,7 @@ fi
 Start=$(date +%s)
 now="$(date "+%Y-%m-%d %T %Z")"
 export LC_ALL=en_US.UTF-8
+TitleString="Restore report for “$GitServer” on $(date +%F)"
 StopRebootFile=/tmp/dont_reboot
 TodayDate=$(date +%Y_%m_%d)                                                                                            # Ex: TodayDate=2023_09_12
 LogDir="/var/tmp"
@@ -203,7 +204,7 @@ prepare_email() {
     echo "Subject: STATUS" >> "$EmailTempFile"
     echo "Content-Type: text/html" >> "$EmailTempFile"
     echo "" >> "$EmailTempFile"
-    curl --silent $ReportHead | sed "s/SERVER/$GitServer/;s/DATE/$(date +%F)/;s/Backup report/Restore report/;$CSS_colorfix" >> "$EmailTempFile"
+    curl --silent $ReportHead | sed "s/TITLE/$TitleString/;$CSS_colorfix" >> "$EmailTempFile"
     echo '<body>' >> "$EmailTempFile"
     echo '<div class="main_page">' >> "$EmailTempFile"
     echo '  <div class="flexbox-container">' >> "$EmailTempFile"
