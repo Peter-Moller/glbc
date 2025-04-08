@@ -48,6 +48,7 @@ LocalBackupFS="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $1}')"  
 
 # Get the amount of storage available locally:
 SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                                         # Ex: SpaceAvailable='301852954624'
+GitLabRestoreMethod="GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} $BackupOptions force=yes"
 RestoreMethod="copy <code>gitlab-secrets.json</code> &#8594; <code>$LocalConfDir</code><br>"
 RestoreMethod+="copy <code>ssh_*</code> &#8594; <code>$LocalConfDir</code><br>"
 RestoreMethod+="copy <code>docker-compose.yaml</code> &#8594; <code>$LocalConfDir</code><br>"
@@ -55,7 +56,7 @@ RestoreMethod+="<code>docker compose up --force-recreate -d</code><br>"
 RestoreMethod+="<i>Wait...</i><br>"
 RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop puma</code><br>"
 RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop sidekiq</code><br>"
-RestoreMethod+="<code>docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes'</code><br>"
+RestoreMethod+="<code>docker exec -t gitlab sh -c \"$GitLabRestoreMethod\"</code><br>"
 RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl reconfigure</code><br>"
 RestoreMethod+="<code>docker restart gitlab</code><br>"
 RestoreMethod+="<i>Wait...</i><br>"
@@ -314,7 +315,9 @@ restore_gitlab() {
     RestoreTimeStart="$(date +%F" "%H:%M)"
 
     # Run the restore. NOTE: "_gitlab_backup.tar" is omitted from the name
-    docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes' &>"$GitlabImportLog"
+    #docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} SKIP=builds,artifacts,registry force=yes' &>"$GitlabImportLog"
+    #docker exec -t gitlab sh -c "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} $BackupOptions force=yes" &>"$GitlabImportLog"
+    docker exec -t gitlab sh -c "$GitLabRestoreMethod" &>"$GitlabImportLog"
     ES_restore_gitlab=$?
     if [ $ES_restore_gitlab -eq 0 ]; then
         RestoreStatus="successful"
@@ -438,7 +441,8 @@ if [ -n "$RemoteFile" ]; then
 
             # Delete the old instance (save the directory 'backups')
             mv data/backups _backups
-            rm -rf data/*
+            rm -rf data
+            mkdir data
             mv _backups data/backups
 
             restore_gitlab
