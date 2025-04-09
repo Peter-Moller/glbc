@@ -256,7 +256,7 @@ email_success() {
 # Create email for when not enogh space is available on local disk
 email_not_enough_space() {
     echo '        <tr><td>Status:</td><td style="color: style="color: red">GitLab on '$GitServer' NOT restored</td></tr>' >> "$EmailTempFile"
-    echo '        <tr><td>Reason:</td>Insufficient space to perform the restore</td></tr>' >> "$EmailTempFile"
+    echo '        <tr><td>Reason:</td><td>Insufficient space to perform the restore</td></tr>' >> "$EmailTempFile"
     echo '        <tr><td>Filename:</td><td>'$BackupFile'</td></tr>' >> "$EmailTempFile"
     echo '        <tr><td>File size:</td><td>'$(printf "%'d" $((FileSize / 1048576)))' MiB</td></tr>' >> "$EmailTempFile"
     echo '        <tr><td>Available space:</td><td>'$(printf "%'d" $((SpaceAvailable / 1048576)))' MiB</td></tr>' >> "$EmailTempFile"
