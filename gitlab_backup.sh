@@ -13,6 +13,9 @@
 # First created 2022-05-13
 # Peter Möller, Department of Computer Science, Lund University
 
+# Exit if the script is already running:
+pidof -o %PPID -x "$(basename "$0")" >/dev/null && { echo "$(date +%F" "%T): Script $(basename "$0") is already running" >2; exit 1; }
+
 # Read nessesary settings file. Exit if it’s not found
 if [ -r ~/.gitlab_backup.settings ]; then
     source ~/.gitlab_backup.settings
@@ -91,7 +94,7 @@ notify() {
 
 # Make room so that we can perform a backup
 make_room() {
-    /usr/bin/find /opt/gitlab/data/backups -type f -mtime +"$DeleteFilesNumDays" -exec rm -rf {} \; &>/tmp/backup_cleanup.txt
+    /usr/bin/find $LocalBackupDir -type f -mtime +"$DeleteFilesNumDays" -exec rm -rf {} \; &>/tmp/backup_cleanup.txt
 }
 
 
@@ -158,8 +161,8 @@ gitlab_backup() {
     else
         BackupName="probably_broken_$(date +%F)_gitlab_backup.tar"
     fi
-    GitlabVersionInFile="$(tar -xOf "/opt/gitlab/data/backups/$BackupName" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')" # Ex: GitlabVersionInFile=16.2.4
-    BackupFileSizeB=$(find "/opt/gitlab/data/backups/$BackupName" -exec ls -ls {} \; | awk '{print $6}')               # Ex: BackupFileSizeB='47692830720'
+    GitlabVersionInFile="$(tar -xOf "$LocalBackupDir/$BackupName" backup_information.yml | grep -E "^:gitlab_version" | awk '{print $NF}')" # Ex: GitlabVersionInFile=16.2.4
+    BackupFileSizeB=$(find "$LocalBackupDir/$BackupName" -exec ls -ls {} \; | awk '{print $6}')               # Ex: BackupFileSizeB='47692830720'
     #BackupFileSizeMiB="$(printf "%'d" $((BackupFileSize / 1048576))) MiB"                                             # Ex: BackupFileSizeMic='45,483 MiB'
     #BackupFileSizeGiB="$(printf "%'d" $(( $((BackupFileSize+536870912)) / 1073741824))) GiB"                          # Ex: BackupFileSizeGiB='47 GiB'
     BackupFileSize="$(volume "$BackupFileSizeB")"                                                                      # Ex: BackupFileSize='44 GiB'
