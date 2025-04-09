@@ -18,7 +18,7 @@
 # Peter Möller, Department of Computer Science, Lund University
 
 # Exit if the script is already running:
-pidof -o %PPID -x "$(basename "$0")" >/dev/null && { echo "$(date +%F" "%T): Script $(basename "$0") is already running" >2; exit 1; }
+pidof -o %PPID -x "$(basename "$0")" >/dev/null && { echo "$(date +%F" "%T): Script $(basename "$0") is already running" >&2; exit 1; }
 
 # Read nessesary settings file. Exit if it’s not found
 if [ -r ~/.gitlab_backup.settings ]; then
@@ -305,6 +305,7 @@ send_email() {
 restore_gitlab() {
     # Create a new, empty instance
     cd /opt/gitlab/ || exit 1
+    echo "$(date +%F" "%T): performing 'docker compose up --force-recreate -d'" >&2
     docker compose up --force-recreate -d
 
     # Wait until it's up
@@ -317,6 +318,7 @@ restore_gitlab() {
     RestoreTimeStart="$(date +%F" "%H:%M)"
 
     # Run the restore. NOTE: "_gitlab_backup.tar" is omitted from the name
+    echo "$(date +%F" "%T): performing \'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes\'" >&2
     docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes' &>"$GitlabImportLog"
     ES_restore_gitlab=$?
     if [ $ES_restore_gitlab -eq 0 ]; then
@@ -333,6 +335,7 @@ restore_gitlab() {
     fi
 
     echo "reconfigure of gitlab after restore" > $StopRebootFile
+    echo "$(date +%F" "%T): performing 'gitlab-ctl reconfigure'" >&2
     docker exec -t gitlab gitlab-ctl reconfigure &>"$GitlabReconfigureLog"
     # Start gitlab again:
     docker restart gitlab
@@ -342,6 +345,7 @@ restore_gitlab() {
 
     # Check if everything is OK:
     echo "checking gitlab after restore" > "$StopRebootFile"
+    echo "$(date +%F" "%T): performing 'gitlab-rake gitlab:check SANITIZE=true'" >&2
     docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true &>"$GitlabVerifyLog"
     ES_sanitycheck=$?
     if [ $ES_sanitycheck -eq 0 ]; then
@@ -366,6 +370,7 @@ restore_gitlab() {
 # Copy the database backup
 copy_database() {
     local CopyStart=$(date +%s)
+    echo "$(date +%F" "%T): getting the backup file ($RemoteFileName) from $RemoteHost" >&2
     scp $RemoteUser@$RemoteHost:"$RemoteFileName" . &>/dev/null
     ES_scp_database=$?
     CopyTimeSecs=$(( $(date +%s) - CopyStart ))
