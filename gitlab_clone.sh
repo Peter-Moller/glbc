@@ -17,54 +17,6 @@
 # First created 2022-05-13
 # Peter Möller, Department of Computer Science, Lund University
 
-# Exit if the script is already running:
-pidof -o %PPID -x "$(basename "$0")" >/dev/null && { echo "$(date +%F" "%T): Script $(basename "$0") is already running" >&2; exit 1; }
-
-# Read nessesary settings file. Exit if it’s not found
-if [ -r ~/.gitlab_backup.settings ]; then
-    source ~/.gitlab_backup.settings
-else
-    echo "Settings file not found. Will exit!"
-    exit 1
-fi
-
-# General settings
-Start=$(date +%s)
-now="$(date "+%Y-%m-%d %T %Z")"
-export LC_ALL=en_US.UTF-8
-TitleString="Restore report for “$GitServer” on $(date +%F)"
-StopRebootFile=/tmp/dont_reboot
-TodayDate=$(date +%Y_%m_%d)                                                                                            # Ex: TodayDate=2023_09_12
-LogDir="/var/tmp"
-GitlabImportLog=$LogDir/gitlab_importlogg_$(date +%F).txt
-GitlabReconfigureLog=$LogDir/gitlab_reconfigurelogg_$(date +%F).txt
-GitlabVerifyLog=$LogDir/gitlab_verifylogg_$(date +%F).txt
-GitlabReadinessURL="https://localhost/-/readiness"
-# What version og GitLab is running (prior to restore)
-RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\r' | tr -d '\n')"     # Ex: RunningVersion='gitlab-ce 16.3.0'
-NL=$'\n'
-FormatStr="%-19s%-50s"
-CSS_colorfix="s/jobe_th_bgc/${jobe_th_bgc:-22458a}/g;s/jobe_th_c/${jobe_th_c:-white}/g;s/box_h_bgc/${box_h_bgc:-22458a}/g;s/box_h_c/${box_h_c:-white}/g"
-
-LocalBackupMP="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $NF}')"                                        # Ex: LocalBackupMP=/opt
-LocalBackupFS="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $1}')"                                         # Ex: LocalBackupFS=/dev/mapper/vg1-opt
-
-# Get the amount of storage available locally:
-SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                                         # Ex: SpaceAvailable='301852954624'
-RestoreMethod="copy <code>gitlab-secrets.json</code> &#8594; <code>$LocalConfDir</code><br>"
-RestoreMethod+="copy <code>ssh_*</code> &#8594; <code>$LocalConfDir</code><br>"
-RestoreMethod+="copy <code>docker-compose.yaml</code> &#8594; <code>$LocalConfDir</code><br>"
-RestoreMethod+="<code>docker compose up --force-recreate -d</code><br>"
-RestoreMethod+="<i>Wait...</i><br>"
-RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop puma</code><br>"
-RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop sidekiq</code><br>"
-RestoreMethod+="<code>docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes'</code><br>"
-RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl reconfigure</code><br>"
-RestoreMethod+="<code>docker restart gitlab</code><br>"
-RestoreMethod+="<i>Wait...</i><br>"
-RestoreMethod+="<code>docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true</code>"
-
-
 
 
 #==============================================================================================================
@@ -75,6 +27,84 @@ RestoreMethod+="<code>docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=tr
 #  /\__/ / | || | | || |\ \  | |    \ \_/ / |      | |   | |_| | |\  | \__/\ | |  _| |_\ \_/ / |\  |/\__/ /
 #  \____/  \_/\_| |_/\_| \_| \_/     \___/\_|      \_|    \___/\_| \_/\____/ \_/  \___/ \___/\_| \_/\____/ 
 #
+
+
+# Check to see if the script is already running. Exit if so
+CheckRunning() {
+    if pidof -o %PPID -x "$(basename "$0")" >/dev/null; then
+        debug "CRITICAL! Script $(basename "$0") is already running"
+
+        tempfile=$(mktemp)
+        pidof -o %PPID -x "$(basename "$0")" >$tempfile
+        ProcessStartTime="$(ps -fo start_time -p $(cat $tempfile) --no-headers)"    # Ex: ProcessStartTime=08:55
+        rm $tempfile
+
+        prepare_email
+        echo '        <tr><td>Status:</td><td style="color: style="color: red">GitLab on '$GitServer' NOT restored</td></tr>' >> "$EmailTempFile"
+        echo '        <tr><td>Reason:</td><td>Restore script is already running</td></tr>' >> "$EmailTempFile"
+        echo "        <tr><td>Details:</td><td>The alreay-running script was started at: $ProcessStartTime</td></tr>" >> "$EmailTempFile"
+        MailSubject="Script already running"
+        send_email
+        exit 1
+    fi
+}
+
+# Read nessesary settings file. Exit if it’s not found
+Initialize() {
+    if [ -r ~/.gitlab_backup.settings ]; then
+        source ~/.gitlab_backup.settings
+        # General settings
+        Start=$(date +%s)
+        now="$(date "+%Y-%m-%d %T %Z")"
+        export LC_ALL=en_US.UTF-8
+        TitleString="Restore report for “$GitServer” on $(date +%F)"
+        StopRebootFile=/tmp/dont_reboot
+        TodayDate=$(date +%Y_%m_%d)                                                                                            # Ex: TodayDate=2023_09_12
+        LogDir="/var/tmp"
+        GitlabImportLog=$LogDir/gitlab_importlogg_$(date +%F).txt
+        GitlabReconfigureLog=$LogDir/gitlab_reconfigurelogg_$(date +%F).txt
+        GitlabVerifyLog=$LogDir/gitlab_verifylogg_$(date +%F).txt
+        GitlabReadinessURL="https://localhost/-/readiness"
+        # What version og GitLab is running (prior to restore)
+        RunningVersion="$(docker exec -t gitlab cat /opt/gitlab/version-manifest.txt | head -1 | tr -d '\r' | tr -d '\n')"     # Ex: RunningVersion='gitlab-ce 16.3.0'
+        NL=$'\n'
+        FormatStr="%-19s%-50s"
+        CSS_colorfix="s/jobe_th_bgc/${jobe_th_bgc:-22458a}/g;s/jobe_th_c/${jobe_th_c:-white}/g;s/box_h_bgc/${box_h_bgc:-22458a}/g;s/box_h_c/${box_h_c:-white}/g"
+
+        LocalBackupMP="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $NF}')"                                        # Ex: LocalBackupMP=/opt
+        LocalBackupFS="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $1}')"                                         # Ex: LocalBackupFS=/dev/mapper/vg1-opt
+
+        # Get the amount of storage available locally:
+        SpaceAvailable=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                                         # Ex: SpaceAvailable='301852954624'
+        RestoreMethod="copy <code>gitlab-secrets.json</code> &#8594; <code>$LocalConfDir</code><br>"
+        RestoreMethod+="copy <code>ssh_*</code> &#8594; <code>$LocalConfDir</code><br>"
+        RestoreMethod+="copy <code>docker-compose.yaml</code> &#8594; <code>$LocalConfDir</code><br>"
+        RestoreMethod+="<code>docker compose up --force-recreate -d</code><br>"
+        RestoreMethod+="<i>Wait...</i><br>"
+        RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop puma</code><br>"
+        RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl stop sidekiq</code><br>"
+        RestoreMethod+="<code>docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes'</code><br>"
+        RestoreMethod+="<code>docker exec -t gitlab gitlab-ctl reconfigure</code><br>"
+        RestoreMethod+="<code>docker restart gitlab</code><br>"
+        RestoreMethod+="<i>Wait...</i><br>"
+        RestoreMethod+="<code>docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true</code>"
+    else
+        debug "CRITICAL! Settings file ~/.gitlab_backup.settings not found. Will exit!"
+        prepare_email
+        echo '        <tr><td>Status:</td><td style="color: style="color: red">GitLab on '$GitServer' NOT restored</td></tr>' >> "$EmailTempFile"
+        echo '        <tr><td>Reason:</td><td>The configuration file (<code>~/.gitlab_backup.settings</code>) was not found </td></tr>' >> "$EmailTempFile"
+        MailSubject="Settings file not found"
+        send_email
+        exit 1
+    fi
+}
+
+
+# Send debug information to StdErr
+debug() {
+    local DebugMessage="$1"
+    echo "$(date +%F" "%T): $DebugMessage" >&2
+}
 
 
 # Find where the script resides
@@ -114,7 +144,7 @@ script_launcher() {
 
 # House cleaning
 delete_old_files() {
-    /usr/bin/find /opt/gitlab/data/backups/ -type f -mtime +3 -exec rm -f {} \;
+    /usr/bin/find $LocalBackupDir/ -type f -mtime +3 -exec rm -f {} \;
     /usr/bin/find $LogDir/ -type f -mtime +30 -exec rm -f {} \;
 }
 
@@ -305,7 +335,7 @@ send_email() {
 restore_gitlab() {
     # Create a new, empty instance
     cd /opt/gitlab/ || exit 1
-    echo "$(date +%F" "%T): performing 'docker compose up --force-recreate -d'" >&2
+    debug "performing 'docker compose up --force-recreate -d'"
     docker compose up --force-recreate -d
 
     # Wait until it's up
@@ -318,14 +348,16 @@ restore_gitlab() {
     RestoreTimeStart="$(date +%F" "%H:%M)"
 
     # Run the restore. NOTE: "_gitlab_backup.tar" is omitted from the name
-    echo "$(date +%F" "%T): performing \'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes\'" >&2
-    docker exec -t gitlab sh -c 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes' &>"$GitlabImportLog"
+    debug "performing 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes'"
+    docker exec -t gitlab sh -c "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes" &>"$GitlabImportLog"
+    #docker exec -t gitlab "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes" &>"$GitlabImportLog"
     ES_restore_gitlab=$?
+    debug "restore is done. Exit status: $ES_restore_gitlab"
     if [ $ES_restore_gitlab -eq 0 ]; then
         RestoreStatus="successful"
         Level="GOOD"
         MailSubject="Restore successful"
-        RestoreStatusTC="green"
+     .gitlab_backup.settings   RestoreStatusTC="green"
     else
         RestoreStatus="unsuccessful"
         Level="CRIT"
@@ -335,7 +367,7 @@ restore_gitlab() {
     fi
 
     echo "reconfigure of gitlab after restore" > $StopRebootFile
-    echo "$(date +%F" "%T): performing 'gitlab-ctl reconfigure'" >&2
+    debug "performing 'gitlab-ctl reconfigure'"
     docker exec -t gitlab gitlab-ctl reconfigure &>"$GitlabReconfigureLog"
     # Start gitlab again:
     docker restart gitlab
@@ -345,7 +377,7 @@ restore_gitlab() {
 
     # Check if everything is OK:
     echo "checking gitlab after restore" > "$StopRebootFile"
-    echo "$(date +%F" "%T): performing 'gitlab-rake gitlab:check SANITIZE=true'" >&2
+    debug "performing 'gitlab-rake gitlab:check SANITIZE=true'"
     docker exec -t gitlab gitlab-rake gitlab:check SANITIZE=true &>"$GitlabVerifyLog"
     ES_sanitycheck=$?
     if [ $ES_sanitycheck -eq 0 ]; then
@@ -370,8 +402,9 @@ restore_gitlab() {
 # Copy the database backup
 copy_database() {
     local CopyStart=$(date +%s)
-    echo "$(date +%F" "%T): getting the backup file ($RemoteFileName) from $RemoteHost" >&2
+    debug "getting the backup file ($RemoteFileName) from $RemoteHost" 
     scp $RemoteUser@$RemoteHost:"$RemoteFileName" . &>/dev/null
+    chmod 644 "$BackupFile"
     ES_scp_database=$?
     CopyTimeSecs=$(( $(date +%s) - CopyStart ))
     CopyTimeRaw="$((CopyTimeSecs/3600)) hour $((CopyTimeSecs%3600/60)) min $((CopyTimeSecs%60)) sec"
@@ -406,6 +439,11 @@ copy_config() {
 #
 #==============================================================================================================
 
+
+
+Initialize
+
+CheckRunning
 
 script_name_location
 
@@ -447,6 +485,7 @@ if [ -n "$RemoteFile" ]; then
             # Delete the old instance (save the directory 'backups')
             mv data/backups _backups
             rm -rf data/*
+            mkdir data
             mv _backups data/backups
 
             restore_gitlab
