@@ -352,12 +352,17 @@ restore_gitlab() {
     docker exec -t gitlab sh -c "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes" &>"$GitlabImportLog"
     #docker exec -t gitlab "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes" &>"$GitlabImportLog"
     ES_restore_gitlab=$?
-    debug "restore is done. Exit status: $ES_restore_gitlab"
-    if [ $ES_restore_gitlab -eq 0 ]; then
+    if [ -n "$(grep 'no space left on device' "$GitlabImportLog")" ]; then
+        OutOfSpace='true'
+    else
+        OutOfSpace='false'
+    fi
+    debug "restore is done. Exit status: $ES_restore_gitlab. Out-of-space: $OutOfSpace"
+    if [ $ES_restore_gitlab -eq 0 ] && [ "$OutOfSpace" = 'false' ]; then
         RestoreStatus="successful"
         Level="GOOD"
         MailSubject="Restore successful"
-     .gitlab_backup.settings   RestoreStatusTC="green"
+        RestoreStatusTC="green"
     else
         RestoreStatus="unsuccessful"
         Level="CRIT"
