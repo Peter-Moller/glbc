@@ -24,6 +24,8 @@ else
     exit 1
 fi
 
+# csms-notify
+source /etc/csms/monitor.conf
 NL=$'\n'
 TitleString="Backup report for “$GitServer” on $(date +%F)"
 export LC_ALL=en_US.UTF-8
@@ -169,15 +171,30 @@ gitlab_backup() {
     SpaceAvailableAfterBackup=$(df -kB1 $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}')                          # Ex: SpaceAvailableAfterBackup=67525095424
     SpaceAfterBackupGiB="$(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $4}' | sed 's/G$//') GiB"            # Ex: SpaceAfterBackupGiB='261 GiB'
     SpaceAfterBackupPercent="$(echo "scale=0; 100 - $(df -kh $LocalBackupDir | grep -Ev "^Fil" | awk '{print $5}' | tr -d '%')" | bc -l)%"   # Ex: SpaceAfterBackupPercent=45%
-    DetailsJSONBackup='{ "reporter": "'$ScriptFullName'", "file-name": "'$BackupName'", "num-bytes": '${BackupFileSizeB:-0}' }'
+    #DetailsJSONBackup='{ "reporter": "'$ScriptFullName'", "file-name": "'$BackupName'", "num-bytes": '${BackupFileSizeB:-0}' }' # Not used
 
     if [ $ESbackup -eq 0 ]; then
-        notify "app.gitlab.backup" "Backup of gitlab performed successfully in ${TimeTakenBackup/0 hour /}" "GOOD" "$DetailsJSONBackup"
         BackupResult="successful"
+        EventMessage="Backup of gitlab performed successfully in ${TimeTakenBackup/0 hour /}"
+        EventStatus="good"
     else
-        notify "app.gitlab.backup" "Backup of gitlab on $GitServer FAILED (time: ${TimeTakenBackup/0 hour /})" "CRIT" "$DetailsJSONBackup"
         BackupResult="unsuccessful"
+        EventMessage="Backup of gitlab on $GitServer FAILED (time: ${TimeTakenBackup/0 hour /})"
+        EventStatus="severe"
     fi
+
+    #SummaryMarkdown="|Backup| |$NL|---|---|$NL|Status:|$StatusBackup|$NL|File size:|$BackupFileSize|$NL|Time taken:|$TimeTakenBackup|$NL" # Not used
+
+    csms-notify --type "app.gitlab.backup" \
+        --status "$EventStatus" \
+        --message "$EventMessage" \
+        --detail-format json \
+        --detail-json-schema "urn:report:file-metadata" \
+        --string "reporter=$ScriptFullName" \
+        --string "method=gitlab gitlab-backup create" \
+        --string "arguments=$BackupOptions" \
+        --float "duration-sec=${TimeBackupSec:-0}" \
+        --fileinfo "$LocalBackupDir/$BackupName"
 }
 
 
@@ -214,16 +231,37 @@ rsync_backup() {
     FilesData=$(echo "$RsyncData" | grep -vcE "^building file list |^\.\/$|^$|^sent |^total|\/$")
     FilesConf=$(echo "$RsyncConf" | grep -vcE "^building file list |^\.\/$|^$|^sent |^total|\/$")
     FilesNumTransferred=$((${FilesData:-0} + ${FilesConf:-0}))
-    DetailsJSONRsync='{"remote-dir-data":"'$RemoteDataPath'","remote-dir-conf":"'$RemoteConfPath'","reporter":"'$ScriptFullName'","rsync-stats": { "files":'${FilesNumTransferred:-0}', "bytes": '${TransferredB:-0}', "time": '${TimeSyncSec:-0}'}}'
+    #DetailsJSONRsync='{"remote-dir-data":"'$RemoteDataPath'","remote-dir-conf":"'$RemoteConfPath'","reporter":"'$ScriptFullName'","rsync-stats": { "files":'${FilesNumTransferred:-0}', "bytes": '${TransferredB:-0}', "time": '${TimeSyncSec:-0}'}}' # Not used
 
     # Notify the CS Monitoring System
     if [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ] && [ $ESScp -eq 0 ]; then
-        notify "app.rsync.backup" "Rsync of git-backup and config to $RemoteHost in ${TimeTakenRsync/0 hour /}" "GOOD" "$DetailsJSONRsync"
         StatusRsync="successful"
+        EventMessage="Rsync of git-backup and config to $RemoteHost in ${TimeTakenRsync/0 hour /}"
+        EventStatus="good"
     else
-        notify "app.rsync.backup" "Rsync of git-backup to $RemoteHost FAILED (time: ${TimeTakenRsync/0 hour /})" "CRIT" "$DetailsJSONRsync"
         StatusRsync="unsuccessful"
+        EventMessage="Rsync of git-backup to $RemoteHost FAILED (${TimeTakenRsync/0 hour /})"
+        EventStatus="severe"
     fi
+
+    #SummaryMarkdown="|Rsync| |$NL|---|---|$NL|Status:|$StatusRsync|$NL|Number of files:|${FilesNumTransferred:-0}|$NL|Volume transferred:|$(printf "%'d" $((TransferredB / 1048576))) MiB|$NL|Time taken:|$TimeTakenRsync|$NL"
+    
+    csms-notify --type "app.rsync.backup" \
+        --status "$EventStatus" \
+        --message "$EventMessage" \
+        --detail-format json \
+        --detail-json-schema "urn:report:file-metadata" \
+        --string "reporter=$ScriptFullName" \
+        --string "method=rsync" \
+        --string "arguments=$RsyncArgs" \
+        --string "source-path-data=$LocalBackupDir" \
+        --string "source-path-config=$LocalConfDir" \
+        --string "target-path-data=$RemoteHost:$RemoteDataPath" \
+        --string "target-path-config=$RemoteHost:$RemoteConfPath" \
+        --float "duration-sec=${TimeSyncSec:-0}" \
+        --integer "total-bytes=${TransferredB:-0}" \
+        --integer "total-files=${FilesNumTransferred:-0}" \
+        --target-host "$RemoteHost"
 }
 
 
@@ -379,6 +417,23 @@ email_html_send() {
     fi
 }
 
+csms_notify_report() {
+    if [ $ESbackup -eq 0 ] && [ $ESrsync1 -eq 0 ] && [ $ESrsync2 -eq 0 ] && [ $ESScp -eq 0 ]; then
+        EventMessage="Sucessful"
+        EventStatus="good"
+    else
+        EventMessage="Unsucessful"
+        EventStatus="crit"
+    fi
+
+    csms-notify --type "report.backup" \
+        --status "$EventStatus" \
+        --message "$EventMessage" \
+        --detail-format html \
+        --file "$EmailTempFile" \
+        --probe "report.gitlab.backup"
+}
+
 #
 #   _____ _   _______    ___________   ______ _   _ _   _ _____ _____ _____ _____ _   _  _____
 #  |  ___| \ | |  _  \  |  _  |  ___|  |  ___| | | | \ | /  __ \_   _|_   _|  _  | \ | |/  ___|
@@ -415,6 +470,8 @@ else
     create_email
     email_send
 fi
+
+csms_notify_report
 
 # Remove the block against reboot:
 rm $StopRebootFile
