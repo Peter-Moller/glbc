@@ -53,6 +53,8 @@ CheckRunning() {
 Initialize() {
     if [ -r ~/.gitlab_backup.settings ]; then
         source ~/.gitlab_backup.settings
+        # csms-notify
+        source /etc/csms/monitor.conf
         # General settings
         Start=$(date +%s)
         now="$(date "+%Y-%m-%d %T %Z")"
@@ -154,21 +156,6 @@ trigger_maintenance() {
     MaintenanceDuration="$1"
     if [ -n "$SOURCE_TOKEN" ]; then
         curl -X 'POST' https://monitor.cs.lth.se/api/v1/sources/trigger-maintenance/"$SOURCE_TOKEN"/"$MaintenanceDuration" -H 'accept: application/json' -d '' &>/dev/null
-    fi
-}
-
-
-# Send a notification to the CS Monitoring System
-notify() {
-    Object=$1
-    Message=$2
-    Level=$3
-    Details=$4
-    if [ -z "$Details" ]; then
-        Details="{}"
-    fi
-    if [ -x /opt/monitoring/bin/notify ]; then
-        /opt/monitoring/bin/notify "$Object" "$Message" "${Level:-INFO}" "$Details"
     fi
 }
 
@@ -360,12 +347,12 @@ restore_gitlab() {
     debug "restore is done. Exit status: $ES_restore_gitlab. Out-of-space: $OutOfSpace"
     if [ $ES_restore_gitlab -eq 0 ] && [ "$OutOfSpace" = 'false' ]; then
         RestoreStatus="successful"
-        Level="GOOD"
+        Level="good"
         MailSubject="Restore successful"
         RestoreStatusTC="green"
     else
         RestoreStatus="unsuccessful"
-        Level="CRIT"
+        Level="crit"
         MailSubject="Restore unsuccessful"
         RestoreStatus="unsuccessful"
         RestoreStatusTC="red"
@@ -392,7 +379,7 @@ restore_gitlab() {
         VerifyStatus="unsuccessful"
         VerifyStatusTC="red"
         # Make sure the Level is CRIT even if it was GOOD from the restore
-        Level="CRIT"
+        Level="crit"
     fi
 
     End=$(date +%s)
@@ -498,7 +485,8 @@ if [ -n "$RemoteFile" ]; then
             email_success
 
             # Send notification to the CS Monitoring System ('DetailStrJSON' is constructed in 'restore_gitlab')
-            notify "app.gitlab.restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
+            #notify "app.gitlab.restored" "gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)" "$Level" "$DetailStrJSON"
+            EventMessage="gitlab restored $RestoreStatus in ${TimeTaken/0 hour /}. (Verify: $VerifyStatus)"
 
             # Delete the temporary backupfile
             rm -f "$BackupFile"
@@ -506,7 +494,9 @@ if [ -n "$RemoteFile" ]; then
             # It did not go well:
             # we could not get either the database file or the config files
             # Send notification to the CS Monitoring System ('DetailStrJSON' is constructed in 'restore_gitlab')
-            notify "app.gitlab.restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp_database" "CRIT" "$DetailStrJSON"
+            #notify "app.gitlab.restored" "Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp_database" "CRIT" "$DetailStrJSON"
+            EventMessage="Backup file could not be retrieved from $RemoteHost. No restore performed. Error: $ES_scp_database"
+            Level="crit"
 
             email_files_broken
 
@@ -517,19 +507,30 @@ if [ -n "$RemoteFile" ]; then
     else
         email_not_enough_space
 
-        DetailStrJSON='{ "filename": "'$BackupFile'", "filesize": "'$((FileSize / 1048576))' MiB", "available_local_space": "'$((SpaceAvailable / 1048576))' MiB" }'
-        notify "app.gitlab.restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
+        #DetailStrJSON='{ "filename": "'$BackupFile'", "filesize": "'$((FileSize / 1048576))' MiB", "available_local_space": "'$((SpaceAvailable / 1048576))' MiB" }'
+        #notify "app.gitlab.restored" "Insufficient space to perform the restore" "CRIT" "$DetailStrJSON"
+        EventMessage="Insufficient space to perform the restore"
+        Level="crit"
     fi
 else
     # File not found on $RemoteHost
 
     email_db_file_not_found
 
-    DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
-    notify "app.gitlab.restored" "No file for today ($TodayDate) found on $RemoteHost" "CRIT" "$DetailStrJSON"
+    #DetailStrJSON='{"remote-host":"'$RemoteHost'","reporter":"'$ScriptFullName'"}'
+    #notify "app.gitlab.restored" "No file for today ($TodayDate) found on $RemoteHost" "CRIT" "$DetailStrJSON"
+    EventMessage="No file for today ($TodayDate) found on $RemoteHost"
+    Level="crit"
 fi
 
 send_email
+
+csms notify --type "app.gitlab.restored" \
+    --status "$Level" \
+    --detail-format html \
+    --file "$EmailTempFile" \
+    --message "$EventMessage" \
+    --probe "app.gitlab.restore.report"
 
 # Remove the block against reboot
 rm $StopRebootFile
