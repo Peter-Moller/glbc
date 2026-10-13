@@ -96,7 +96,13 @@ Otherwise, a more comple HTML-report is generated:
 
 ### gitlab_clone.sh
 
-Similarly, a text-only report is given for the cloning unless `USE_HTML_EMAIL`is `true`:
+For a clone to work with this script, the following must be present in the `docker-compose.yaml` file:  
+```bash
+GITLAB_PRE_RECONFIGURE_SCRIPT: "rm -f /run/gitlab-init-complete"
+GITLAB_POST_RECONFIGURE_SCRIPT: "touch /run/gitlab-init-complete"
+```
+
+As the reporing for backup, a text-only report is given for the cloning unless `USE_HTML_EMAIL`is `true`:
 ```text
 Restore report from git-test.dns.name (script: "/home/username/glbc/gitlab_clone.sh")  at 2023-09-07 07:10 CEST
 
