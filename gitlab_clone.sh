@@ -2,9 +2,9 @@
 # Script to import a backup from a GitLab → to a test-server based on docker containers on a Linux server
 #
 # Is aware of:
-# - https://git.cs.lth.se/peterm/autoreboot       (automatically reboots the computer if needed, unless a set of conditions prohibits it)
+# - https://git.cs.lth.se/drift/autoreboot       (automatically reboots the computer if needed, unless a set of conditions prohibits it; private repo)
 # Uses:
-# - https://git.cs.lth.se/peterm/notify_monitor   (Make a note to the CS Monitoring System)
+# - https://git.cs.lth.se/drift/csms             (Make a note to the CS Monitoring System; private repo)
 # 
 # It will:
 # 1. Check to see that there is an applicable file on the file server
@@ -17,7 +17,8 @@
 # First created 2022-05-13
 # Peter Möller, Department of Computer Science, Lund University
 
-
+LOCKFILE=/run/lock/gitlab-restore.lock
+exec 9>>"$LOCKFILE"
 
 #==============================================================================================================
 #   _____ _____ ___  ______ _____    ___________   ______ _   _ _   _ _____ _____ _____ _____ _   _  _____ 
@@ -31,22 +32,19 @@
 
 # Check to see if the script is already running. Exit if so
 CheckRunning() {
-    if pidof -o %PPID -x "$(basename "$0")" >/dev/null; then
-        debug "CRITICAL! Script $(basename "$0") is already running"
-
-        tempfile=$(mktemp)
-        pidof -o %PPID -x "$(basename "$0")" >$tempfile
-        ProcessStartTime="$(ps -fo start_time -p $(cat $tempfile) --no-headers)"    # Ex: ProcessStartTime=08:55
-        rm $tempfile
-
+    if ! flock -n 9; then
         prepare_email
         echo '        <tr><td>Status:</td><td style="color: style="color: red">GitLab on '$GitServer' NOT restored</td></tr>' >> "$EmailTempFile"
         echo '        <tr><td>Reason:</td><td>Restore script is already running</td></tr>' >> "$EmailTempFile"
-        echo "        <tr><td>Details:</td><td>The alreay-running script was started at: $ProcessStartTime</td></tr>" >> "$EmailTempFile"
+        echo "        <tr><td>Details:</td><td>Details: $(cat "$LOCKFILE" 2>/dev/null)</td></tr>" >> "$EmailTempFile"
         MailSubject="Script already running"
         send_email
         exit 1
     fi
+
+    # We have the lock now, so it is safe to replace its contents.
+    truncate -s 0 "$LOCKFILE"
+    printf 'PID=%s START=%s\n' "$$" "$(ps -o lstart= -p $$)" >&9
 }
 
 # Read nessesary settings file. Exit if it’s not found
@@ -162,15 +160,51 @@ trigger_maintenance() {
 
 # Wait untill gitlab is up and running again
 SleepWait() {
-    while true
-    do
-        STATUS="$(docker exec -t gitlab curl -k "$GitlabReadinessURL" 2>/dev/null | jq -r '.status' 2>/dev/null)"                             # Ex: STATUS=ok
-        MASTER_CHECK="$(docker exec -t gitlab curl -k "$GitlabReadinessURL" 2>/dev/null | jq -r '.master_check[0].status' 2>/dev/null)"       # Ex: MASTER_CHECK=ok
-        if [ "$STATUS" = "ok" ] && [ "$MASTER_CHECK" = "ok" ]; then
-            break
+    local timeout=1800
+    local elapsed=0
+    local response status master_check
+
+    while [ "$elapsed" -lt "$timeout" ]; do
+        response="$(docker exec gitlab curl -ksS --max-time 10 "$GitlabReadinessURL" 2>/dev/null)"
+
+        status="$(jq -r '.status // empty' <<<"$response" 2>/dev/null)"
+        master_check="$(jq -r '.master_check[0].status // empty' <<<"$response" 2>/dev/null)"
+
+        if [ "$status" = "ok" ] && [ "$master_check" = "ok" ]; then
+            return 0
         fi
+
         sleep 15
+        elapsed=$((elapsed + 15))
     done
+
+    debug "ERROR: GitLab did not become ready within ${timeout}s"
+    return 1
+}
+
+# Code from ChatGPT, 2026-10-13
+# Purpose: to better wait for a completely initialized container
+WaitForGitlabInit() {
+    local timeout=1800
+    local elapsed=0
+
+    while [ "$elapsed" -lt "$timeout" ]; do
+        if docker exec gitlab test -f /run/gitlab-init-complete 2>/dev/null; then
+            return 0
+        fi
+
+        # Also make sure the container hasn't stopped completely
+        if [ "$(docker inspect -f '{{.State.Running}}' gitlab 2>/dev/null)" != "true" ]; then
+            debug "GitLab container is not running"
+        fi
+
+        sleep 10
+        elapsed=$((elapsed + 10))
+    done
+
+    debug "ERROR: GitLab startup/reconfigure did not complete"
+    docker logs --tail 200 gitlab
+    return 1
 }
 
 
@@ -325,26 +359,53 @@ restore_gitlab() {
     debug "performing 'docker compose up --force-recreate -d'"
     docker compose up --force-recreate -d
 
-    # Wait until it's up
+    # Critical: readiness alone isn't enough
+    # Wait until Docker's startup reconfigure has completed
+    WaitForGitlabInit || return 1
+
+    # Now make sure GitLab is actually operational
     SleepWait
 
     # Stop 'puma' and 'sidekiq':
-    docker exec -t gitlab gitlab-ctl stop puma
-    docker exec -t gitlab gitlab-ctl stop sidekiq
+    docker exec gitlab gitlab-ctl stop puma || return 1
+    docker exec gitlab gitlab-ctl stop sidekiq || return 1
 
     RestoreTimeStart="$(date +%F" "%H:%M)"
 
     # Run the restore. NOTE: "_gitlab_backup.tar" is omitted from the name
-    debug "performing 'gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes'"
-    docker exec -t gitlab sh -c "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes" &>"$GitlabImportLog"
-    #docker exec -t gitlab "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes" &>"$GitlabImportLog"
+    #docker exec -t gitlab sh -c "GITLAB_ASSUME_YES=1 gitlab-backup restore BACKUP=${BackupFile%_gitlab_backup.tar} force=yes" &>"$GitlabImportLog"
+    BackupID="${BackupFile%_gitlab_backup.tar}"
+    debug "performing 'gitlab-backup restore BACKUP=$BackupID force=yes'"
+    docker exec \
+        -e GITLAB_ASSUME_YES=1 \
+        gitlab \
+        gitlab-backup restore \
+        "BACKUP=$BackupID" \
+        force=yes \
+        >"$GitlabImportLog" 2>&1
     ES_restore_gitlab=$?
-    if [ -n "$(grep 'no space left on device' "$GitlabImportLog")" ]; then
+    if grep -qi 'no space left on device' "$GitlabImportLog"; then
         OutOfSpace='true'
     else
         OutOfSpace='false'
     fi
+
     debug "restore is done. Exit status: $ES_restore_gitlab. Out-of-space: $OutOfSpace"
+
+    if [ "$ES_restore_gitlab" -ne 0 ] || [ "$OutOfSpace" = true ]; then
+        RestoreStatus="unsuccessful"
+        Level="crit"
+        MailSubject="Restore unsuccessful"
+        RestoreStatusTC="red"
+
+        debug "Restore failed; restarting GitLab to recover services"
+        docker restart gitlab
+
+        WaitForGitlabInit
+        SleepWait
+
+        return 1
+    fi
     if [ $ES_restore_gitlab -eq 0 ] && [ "$OutOfSpace" = 'false' ]; then
         RestoreStatus="successful"
         Level="good"
@@ -358,13 +419,12 @@ restore_gitlab() {
         RestoreStatusTC="red"
     fi
 
-    echo "reconfigure of gitlab after restore" > $StopRebootFile
-    debug "performing 'gitlab-ctl reconfigure'"
-    docker exec -t gitlab gitlab-ctl reconfigure &>"$GitlabReconfigureLog"
+    echo "Restarting container after restore" > $StopRebootFile
     # Start gitlab again:
     docker restart gitlab
 
     # Wait (restart takes time):
+    WaitForGitlabInit || return 1
     SleepWait
 
     # Check if everything is OK:
